@@ -75,7 +75,7 @@
       width: min(1280px, calc(100% - 32px));
       margin: 24px auto 48px;
       display: grid;
-      grid-template-columns: 420px 1fr;
+      grid-template-columns: 440px 1fr;
       gap: 20px;
     }
 
@@ -183,6 +183,32 @@
       color: var(--muted);
       font-size: 12px;
       line-height: 1.5;
+    }
+
+    .persona-thumb {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #020617;
+      border: 1px solid var(--border);
+      flex: 0 0 auto;
+    }
+
+    .persona-placeholder {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: #020617;
+      border: 1px solid var(--border);
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 11px;
+      text-align: center;
+      padding: 6px;
     }
 
     .character-thumb {
@@ -411,7 +437,25 @@
           最大2名まで選択できます。2名選択時は共創パターンを指定できます。
         </p>
 
-        <div id="personaGrid" class="grid"></div>
+        <label for="personaCategorySelect">絵師カテゴリ</label>
+        <select id="personaCategorySelect"></select>
+        <p class="hint">
+          絵師カテゴリで絞り込みできます。選択済みの絵師はカテゴリを切り替えても保持されます。
+        </p>
+
+        <div class="search-row">
+          <div>
+            <label for="personaSearch">絵師検索</label>
+            <input id="personaSearch" placeholder="絵師名・system_instruction・カテゴリ名で検索" />
+          </div>
+          <button class="secondary small" id="clearPersonaSearchBtn">検索クリア</button>
+        </div>
+
+        <p class="hint" id="personaSearchInfo">
+          検索語を入力すると、現在の絵師カテゴリ内で絞り込みます。
+        </p>
+
+        <div id="personaGrid" class="grid" style="margin-top: 14px;"></div>
 
         <div class="selected-summary" id="selectedPersonaSummary"></div>
 
@@ -531,13 +575,13 @@
   </main>
 
   <script>
-    const SUPABASE_URL = "https://jkacguhaabaqtrjaahgl.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprYWNndWhhYWJhcXRyamFhaGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTIxNjAsImV4cCI6MjA5NzcyODE2MH0.6BnIs9aq4pM9DKicbdiEBG95fvw4Oyihd4YW4_Q1U4c";
+    const SUPABASE_URL = "ここにSupabase Project URLを貼り付け";
+    const SUPABASE_ANON_KEY = "ここにanon public keyを貼り付け";
 
     const FUNCTION_URL =
       "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
 
-    const CHARACTER_IMAGE_SIGN_URL_FUNCTION =
+    const IMAGE_SIGN_URL_FUNCTION =
       "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-character-image-url";
 
     const MAX_PERSONA_SELECTION = 2;
@@ -564,15 +608,22 @@
     const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let personas = [];
+    let personaCategories = [];
     let categories = [];
     let characters = [];
 
     let selectedPersonas = [];
     let selectedCharacters = [];
 
+    let personaRenderToken = 0;
     let characterRenderToken = 0;
 
     const modelName = document.getElementById("modelName");
+
+    const personaCategorySelect = document.getElementById("personaCategorySelect");
+    const personaSearch = document.getElementById("personaSearch");
+    const clearPersonaSearchBtn = document.getElementById("clearPersonaSearchBtn");
+    const personaSearchInfo = document.getElementById("personaSearchInfo");
     const personaGrid = document.getElementById("personaGrid");
     const selectedPersonaSummary = document.getElementById("selectedPersonaSummary");
     const collabPattern = document.getElementById("collabPattern");
@@ -617,11 +668,6 @@
       return value.slice(0, max) + (value.length > max ? "..." : "");
     }
 
-    function getCategoryNameById(categoryId) {
-      const category = categories.find((item) => item.id === categoryId);
-      return category ? category.name : "";
-    }
-
     function normalizeSearchText(text) {
       return String(text || "")
         .toLowerCase()
@@ -629,7 +675,17 @@
         .trim();
     }
 
-    async function getSignedImageUrl(imagePath) {
+    function getPersonaCategoryNameById(categoryId) {
+      const category = personaCategories.find((item) => item.id === categoryId);
+      return category ? category.name : "";
+    }
+
+    function getCategoryNameById(categoryId) {
+      const category = categories.find((item) => item.id === categoryId);
+      return category ? category.name : "";
+    }
+
+    async function getSignedImageUrl(imagePath, imageType = "character") {
       if (!imagePath) return "";
 
       if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
@@ -637,12 +693,13 @@
       }
 
       try {
-        const response = await fetch(CHARACTER_IMAGE_SIGN_URL_FUNCTION, {
+        const response = await fetch(IMAGE_SIGN_URL_FUNCTION, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            imageType,
             path: imagePath,
           }),
         });
@@ -663,11 +720,16 @@
       setStatus("データを読み込み中です...", "");
 
       try {
-        const [personaResult, categoryResult, characterResult] = await Promise.all([
+        const [personaResult, personaCategoryResult, categoryResult, characterResult] = await Promise.all([
           supabaseClient
             .from("artist_prompt_personas")
             .select("*")
             .eq("is_active", true)
+            .order("name", { ascending: true }),
+
+          supabaseClient
+            .from("artist_persona_categories")
+            .select("*")
             .order("name", { ascending: true }),
 
           supabaseClient
@@ -682,16 +744,21 @@
         ]);
 
         if (personaResult.error) throw personaResult.error;
+        if (personaCategoryResult.error) throw personaCategoryResult.error;
         if (categoryResult.error) throw categoryResult.error;
         if (characterResult.error) throw characterResult.error;
 
         personas = personaResult.data || [];
+        personaCategories = personaCategoryResult.data || [];
         categories = categoryResult.data || [];
         characters = characterResult.data || [];
 
-        renderPersonas();
-        renderCategories();
+        renderPersonaCategories();
+        renderCharacterCategories();
+
+        await renderPersonas();
         await renderCharacters();
+
         renderSelectedPersonaSummary();
         renderSelectedCharacterSummary();
 
@@ -701,15 +768,106 @@
       }
     }
 
-    function renderPersonas() {
+    function renderPersonaCategories() {
+      personaCategorySelect.innerHTML = "";
+
+      const allOption = document.createElement("option");
+      allOption.value = "";
+      allOption.textContent = `すべての絵師カテゴリ（${personas.length}件）`;
+      personaCategorySelect.appendChild(allOption);
+
+      personaCategories.forEach((category) => {
+        const count = personas.filter((persona) => persona.category_id === category.id).length;
+        const option = document.createElement("option");
+        option.value = category.id;
+        option.textContent = `${category.name}（${count}件）`;
+        personaCategorySelect.appendChild(option);
+      });
+    }
+
+    function getFilteredPersonas() {
+      const currentCategoryId = personaCategorySelect.value;
+      const keyword = normalizeSearchText(personaSearch.value);
+
+      let basePersonas = personas;
+
+      if (currentCategoryId) {
+        basePersonas = basePersonas.filter((persona) => {
+          return persona.category_id === currentCategoryId;
+        });
+      }
+
+      if (!keyword) {
+        return basePersonas;
+      }
+
+      return basePersonas.filter((persona) => {
+        const categoryName = getPersonaCategoryNameById(persona.category_id);
+
+        const searchSource = normalizeSearchText([
+          persona.name,
+          persona.system_instruction,
+          persona.image_url,
+          categoryName,
+        ].join(" "));
+
+        return searchSource.includes(keyword);
+      });
+    }
+
+    function updatePersonaSearchInfo(filteredCount = null, totalCount = null) {
+      const currentCategoryId = personaCategorySelect.value;
+
+      const total = totalCount ?? personas.filter((persona) => {
+        if (!currentCategoryId) return true;
+        return persona.category_id === currentCategoryId;
+      }).length;
+
+      const filtered = filteredCount ?? getFilteredPersonas().length;
+
+      const keyword = normalizeSearchText(personaSearch.value);
+      const categoryName = currentCategoryId
+        ? getPersonaCategoryNameById(currentCategoryId)
+        : "すべての絵師カテゴリ";
+
+      if (keyword) {
+        personaSearchInfo.textContent = `検索中：${filtered}件 / ${categoryName} 全体：${total}件`;
+      } else {
+        personaSearchInfo.textContent = `${categoryName} 全体：${total}件`;
+      }
+    }
+
+    async function renderPersonas() {
+      const renderToken = ++personaRenderToken;
+
       personaGrid.innerHTML = "";
 
-      if (personas.length === 0) {
-        personaGrid.innerHTML = `<div class="hint">有効な絵師ペルソナがありません。</div>`;
+      const currentCategoryId = personaCategorySelect.value;
+
+      const totalCount = personas.filter((persona) => {
+        if (!currentCategoryId) return true;
+        return persona.category_id === currentCategoryId;
+      }).length;
+
+      const filteredPersonas = getFilteredPersonas();
+
+      updatePersonaSearchInfo(filteredPersonas.length, totalCount);
+
+      if (filteredPersonas.length === 0) {
+        const keyword = normalizeSearchText(personaSearch.value);
+        personaGrid.innerHTML = keyword
+          ? `<div class="hint">検索条件に一致する絵師ペルソナがありません。</div>`
+          : `<div class="hint">この絵師カテゴリには有効な絵師ペルソナがありません。</div>`;
         return;
       }
 
-      personas.forEach((persona) => {
+      const fragment = document.createDocumentFragment();
+
+      for (const persona of filteredPersonas) {
+        if (renderToken !== personaRenderToken) {
+          return;
+        }
+
         const button = document.createElement("button");
         button.type = "button";
         button.className = "persona-button";
@@ -719,10 +877,23 @@
           button.classList.add("selected");
         }
 
+        const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
+        const signedUrl = await getSignedImageUrl(persona.image_url, "persona");
+
+        if (renderToken !== personaRenderToken) {
+          return;
+        }
+
         button.innerHTML = `
+          ${
+            signedUrl
+              ? `<img class="persona-thumb" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(persona.name)}">`
+              : `<div class="persona-placeholder">No Image</div>`
+          }
           <div>
             <strong>${escapeHtml(persona.name)}</strong>
-            <div class="meta">${escapeHtml(getShortText(persona.system_instruction, 140))}</div>
+            <div class="meta">カテゴリ：${escapeHtml(categoryName)}</div>
+            <div class="meta">${escapeHtml(getShortText(persona.system_instruction, 150))}</div>
           </div>
         `;
 
@@ -730,8 +901,15 @@
           togglePersona(persona);
         });
 
-        personaGrid.appendChild(button);
-      });
+        fragment.appendChild(button);
+      }
+
+      if (renderToken !== personaRenderToken) {
+        return;
+      }
+
+      personaGrid.innerHTML = "";
+      personaGrid.appendChild(fragment);
     }
 
     function togglePersona(persona) {
@@ -771,6 +949,12 @@
       renderSelectedPersonaSummary();
     }
 
+    function clearPersonaSearch() {
+      personaSearch.value = "";
+      renderPersonas();
+      setStatus("絵師検索をクリアしました。", "success");
+    }
+
     function renderSelectedPersonaSummary() {
       selectedPersonaSummary.innerHTML = "";
 
@@ -780,10 +964,12 @@
       }
 
       selectedPersonas.forEach((persona, index) => {
+        const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
+
         const chip = document.createElement("span");
         chip.className = "selected-chip";
         chip.innerHTML = `
-          <span>${index === 0 ? "A" : "B"}：${escapeHtml(persona.name)}</span>
+          <span>${index === 0 ? "A" : "B"}：${escapeHtml(persona.name)} / ${escapeHtml(categoryName)}</span>
           <button type="button" aria-label="解除">×</button>
         `;
 
@@ -795,7 +981,7 @@
       });
     }
 
-    function renderCategories() {
+    function renderCharacterCategories() {
       categorySelect.innerHTML = "";
 
       if (categories.length === 0) {
@@ -803,7 +989,7 @@
         option.value = "";
         option.textContent = "カテゴリなし";
         categorySelect.appendChild(option);
-        updateCategoryCount(0, 0);
+        updateCharacterSearchInfo(0, 0);
         return;
       }
 
@@ -815,7 +1001,7 @@
         categorySelect.appendChild(option);
       });
 
-      updateCategoryCount();
+      updateCharacterSearchInfo();
     }
 
     function getFilteredCharacters() {
@@ -843,7 +1029,7 @@
       });
     }
 
-    function updateCategoryCount(filteredCount = null, totalCount = null) {
+    function updateCharacterSearchInfo(filteredCount = null, totalCount = null) {
       const currentCategoryId = categorySelect.value;
 
       const total = totalCount ?? characters.filter((character) => {
@@ -870,7 +1056,7 @@
       const totalCount = characters.filter((character) => character.category_id === currentCategoryId).length;
       const filteredCharacters = getFilteredCharacters();
 
-      updateCategoryCount(filteredCharacters.length, totalCount);
+      updateCharacterSearchInfo(filteredCharacters.length, totalCount);
 
       if (filteredCharacters.length === 0) {
         const keyword = normalizeSearchText(characterSearch.value);
@@ -896,7 +1082,7 @@
           button.classList.add("selected");
         }
 
-        const signedUrl = await getSignedImageUrl(character.image_url);
+        const signedUrl = await getSignedImageUrl(character.image_url, "character");
 
         if (renderToken !== characterRenderToken) {
           return;
@@ -992,10 +1178,13 @@
 
       if (selectedPersonas.length === 1) {
         const persona = selectedPersonas[0];
+        const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
 
         return `
 選択された絵師ペルソナ：
 - ${persona.name}
+- 絵師カテゴリ：${categoryName}
+- 胸像画像パス：${persona.image_url || "未設定"}
 
 この絵師ペルソナの system_instruction を最優先で反映してください。
 `.trim();
@@ -1005,10 +1194,17 @@
       const personaB = selectedPersonas[1];
       const pattern = collabPattern.value || "auto";
 
+      const personaACategory = getPersonaCategoryNameById(personaA.category_id) || "未設定";
+      const personaBCategory = getPersonaCategoryNameById(personaB.category_id) || "未設定";
+
       return `
 選択された絵師ペルソナ：
 - A：${personaA.name}
+  - 絵師カテゴリ：${personaACategory}
+  - 胸像画像パス：${personaA.image_url || "未設定"}
 - B：${personaB.name}
+  - 絵師カテゴリ：${personaBCategory}
+  - 胸像画像パス：${personaB.image_url || "未設定"}
 
 共創パターン：
 ${COLLAB_PATTERN_LABELS[pattern] || COLLAB_PATTERN_LABELS.auto}
@@ -1045,8 +1241,13 @@ ${lines.join("\n")}
       }
 
       const lines = selectedCharacters.map((character, index) => {
+        const categoryName = getCategoryNameById(character.category_id) || "未設定";
+
         return `
 ${index + 1}. ${character.name}
+
+カテゴリ：
+${categoryName}
 
 キャラクター基本設定：
 ${character.base_prompt || "未設定"}
@@ -1064,8 +1265,14 @@ ${lines.join("\n\n")}
 
     function buildCombinedSystemInstruction() {
       const personaInstructions = selectedPersonas.map((persona, index) => {
+        const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
+
         return `
 【絵師${index === 0 ? "A" : "B"}：${persona.name}】
+絵師カテゴリ：${categoryName}
+胸像画像パス：${persona.image_url || "未設定"}
+
+system_instruction：
 ${persona.system_instruction || ""}
 `.trim();
       });
@@ -1081,6 +1288,8 @@ ${persona.system_instruction || ""}
 - 日本語プロンプトは、English Promptの内容を確認しやすい日本語にしてください。
 - キャラクター名は、登録されている名称を尊重してください。
 - キャラクターのbase_promptがある場合は、外見・服装・役割・世界観を優先して反映してください。
+- 絵師ペルソナの胸像画像は、画面上で選択補助として使うための参考情報です。画像そのものを直接読んだ前提で断定しないでください。
+- 絵師ペルソナの画風は system_instruction を最優先で反映してください。
 - 文字なし等の無し設定がある場合は必ず守ってください。
 
 ${personaInstructions.join("\n\n")}
@@ -1182,6 +1391,16 @@ ${buildCharacterPromptBlock()}
       japanesePrompt.textContent = "";
       setStatus("入力と生成結果をクリアしました。", "success");
     }
+
+    personaCategorySelect.addEventListener("change", async () => {
+      await renderPersonas();
+    });
+
+    personaSearch.addEventListener("input", async () => {
+      await renderPersonas();
+    });
+
+    clearPersonaSearchBtn.addEventListener("click", clearPersonaSearch);
 
     categorySelect.addEventListener("change", async () => {
       await renderCharacters();
