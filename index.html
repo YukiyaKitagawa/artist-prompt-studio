@@ -254,6 +254,14 @@
       padding: 0 8px;
     }
 
+    .search-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: end;
+      margin-top: 12px;
+    }
+
     .option-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -377,7 +385,8 @@
     }
 
     @media (max-width: 680px) {
-      .option-grid {
+      .option-grid,
+      .search-row {
         grid-template-columns: 1fr;
       }
 
@@ -438,11 +447,23 @@
 
         <label for="categorySelect">
           カテゴリ
-          <span class="count-badge" id="categoryCountBadge">0</span>
+          <span class="count-badge" id="categoryCountBadge">0件</span>
         </label>
         <select id="categorySelect"></select>
         <p class="hint">
           カテゴリを切り替えても、選択済みキャラクターは保持されます。
+        </p>
+
+        <div class="search-row">
+          <div>
+            <label for="characterSearch">キャラクター検索</label>
+            <input id="characterSearch" placeholder="名前・base_prompt・カテゴリ名で検索" />
+          </div>
+          <button class="secondary small" id="clearCharacterSearchBtn">検索クリア</button>
+        </div>
+
+        <p class="hint" id="characterSearchInfo">
+          検索語を入力すると、現在のカテゴリ内で絞り込みます。
         </p>
 
         <div class="actions">
@@ -528,8 +549,8 @@
   </main>
 
   <script>
-    const SUPABASE_URL = "https://jkacguhaabaqtrjaahgl.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprYWNndWhhYWJhcXRyamFhaGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTIxNjAsImV4cCI6MjA5NzcyODE2MH0.6BnIs9aq4pM9DKicbdiEBG95fvw4Oyihd4YW4_Q1U4c";
+    const SUPABASE_URL = "ここにSupabase Project URLを貼り付け";
+    const SUPABASE_ANON_KEY = "ここにanon public keyを貼り付け";
 
     const FUNCTION_URL =
       "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
@@ -574,6 +595,9 @@
 
     const categorySelect = document.getElementById("categorySelect");
     const categoryCountBadge = document.getElementById("categoryCountBadge");
+    const characterSearch = document.getElementById("characterSearch");
+    const clearCharacterSearchBtn = document.getElementById("clearCharacterSearchBtn");
+    const characterSearchInfo = document.getElementById("characterSearchInfo");
     const characterGrid = document.getElementById("characterGrid");
     const selectedCharacterSummary = document.getElementById("selectedCharacterSummary");
     const clearCharactersBtn = document.getElementById("clearCharactersBtn");
@@ -608,6 +632,18 @@
     function getShortText(text, max = 110) {
       const value = String(text || "");
       return value.slice(0, max) + (value.length > max ? "..." : "");
+    }
+
+    function getCategoryNameById(categoryId) {
+      const category = categories.find((item) => item.id === categoryId);
+      return category ? category.name : "";
+    }
+
+    function normalizeSearchText(text) {
+      return String(text || "")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
     }
 
     async function getSignedImageUrl(imagePath) {
@@ -784,7 +820,7 @@
         option.value = "";
         option.textContent = "カテゴリなし";
         categorySelect.appendChild(option);
-        updateCategoryCount();
+        updateCategoryCount(0, 0);
         return;
       }
 
@@ -795,32 +831,67 @@
         option.textContent = `${category.name}（${count}件）`;
         categorySelect.appendChild(option);
       });
-
-      updateCategoryCount();
     }
 
-    function updateCategoryCount() {
+    function getFilteredCharacters() {
+      const currentCategoryId = categorySelect.value;
+      const keyword = normalizeSearchText(characterSearch.value);
+      const categoryName = getCategoryNameById(currentCategoryId);
+
+      const categoryCharacters = characters.filter((character) => {
+        return character.category_id === currentCategoryId;
+      });
+
+      if (!keyword) {
+        return categoryCharacters;
+      }
+
+      return categoryCharacters.filter((character) => {
+        const searchSource = normalizeSearchText([
+          character.name,
+          character.base_prompt,
+          character.image_url,
+          categoryName,
+        ].join(" "));
+
+        return searchSource.includes(keyword);
+      });
+    }
+
+    function updateCategoryCount(filteredCount = null, totalCount = null) {
       const currentCategoryId = categorySelect.value;
 
-      const count = characters.filter((character) => {
+      const total = totalCount ?? characters.filter((character) => {
         return character.category_id === currentCategoryId;
       }).length;
 
-      categoryCountBadge.textContent = `${count}件`;
+      const filtered = filteredCount ?? getFilteredCharacters().length;
+
+      const keyword = normalizeSearchText(characterSearch.value);
+
+      if (keyword) {
+        categoryCountBadge.textContent = `${filtered}/${total}件`;
+        characterSearchInfo.textContent = `検索中：${filtered}件 / このカテゴリ全体：${total}件`;
+      } else {
+        categoryCountBadge.textContent = `${total}件`;
+        characterSearchInfo.textContent = "検索語を入力すると、現在のカテゴリ内で絞り込みます。";
+      }
     }
 
     async function renderCharacters() {
       characterGrid.innerHTML = "";
-      updateCategoryCount();
 
       const currentCategoryId = categorySelect.value;
+      const totalCount = characters.filter((character) => character.category_id === currentCategoryId).length;
+      const filteredCharacters = getFilteredCharacters();
 
-      const filteredCharacters = characters.filter((character) => {
-        return character.category_id === currentCategoryId;
-      });
+      updateCategoryCount(filteredCharacters.length, totalCount);
 
       if (filteredCharacters.length === 0) {
-        characterGrid.innerHTML = `<div class="hint">このカテゴリにはキャラクターがありません。</div>`;
+        const keyword = normalizeSearchText(characterSearch.value);
+        characterGrid.innerHTML = keyword
+          ? `<div class="hint">検索条件に一致するキャラクターがありません。</div>`
+          : `<div class="hint">このカテゴリにはキャラクターがありません。</div>`;
         return;
       }
 
@@ -880,6 +951,12 @@
       renderCharacters();
       renderSelectedCharacterSummary();
       setStatus("選択中キャラクターを全解除しました。", "success");
+    }
+
+    function clearCharacterSearch() {
+      characterSearch.value = "";
+      renderCharacters();
+      setStatus("キャラクター検索をクリアしました。", "success");
     }
 
     function renderSelectedCharacterSummary() {
@@ -1105,9 +1182,14 @@ ${buildCharacterPromptBlock()}
     }
 
     categorySelect.addEventListener("change", async () => {
-      updateCategoryCount();
       await renderCharacters();
     });
+
+    characterSearch.addEventListener("input", async () => {
+      await renderCharacters();
+    });
+
+    clearCharacterSearchBtn.addEventListener("click", clearCharacterSearch);
 
     clearCharactersBtn.addEventListener("click", clearSelectedCharacters);
 
