@@ -161,6 +161,7 @@
       color: var(--muted);
       line-height: 1.7;
       background: rgba(31, 41, 55, 0.5);
+      grid-column: 1 / -1;
     }
 
     .actions {
@@ -265,7 +266,7 @@
     <section class="card">
       <h2>🎨 プロンプト生成設定</h2>
 
-      <label>Geminiモデル</label>
+      <label for="modelName">Geminiモデル</label>
       <select id="modelName">
         <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash（標準）</option>
         <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
@@ -275,19 +276,33 @@
       <div class="hint">標準は、動作確認済みの Gemini 2.5 Flash にしています。</div>
 
       <label>絵師ペルソナ</label>
-      <div class="hint">Supabaseの personas テーブルから is_active = true の絵師を読み込みます。</div>
+      <div class="hint">
+        Supabaseの artist_prompt_personas テーブルから is_active = true の絵師を読み込みます。
+      </div>
+
       <div class="persona-grid" id="personaGrid">
         <div class="empty-box">絵師ペルソナを読み込み中です...</div>
       </div>
 
       <label for="characterName">キャラクター名</label>
-      <input id="characterName" type="text" value="ナガノAI" placeholder="例：ナガノAI、ナガノ玄、ナガノAIエージェント" />
+      <input
+        id="characterName"
+        type="text"
+        value="ナガノAI"
+        placeholder="例：ナガノAI、ナガノ玄、ナガノAIエージェント"
+      />
 
       <label for="sceneText">作りたいシーン</label>
-      <textarea id="sceneText" placeholder="例：添付のナガノAIが、未来的な建設現場で高校生にAIと建設DXの魅力を説明している。アスペクト比16:9。"></textarea>
+      <textarea
+        id="sceneText"
+        placeholder="例：添付のナガノAIが、未来的な建設現場で高校生にAIと建設DXの魅力を説明している。アスペクト比16:9。"
+      ></textarea>
 
       <label for="extraText">追加条件</label>
-      <textarea id="extraText" placeholder="例：高校生向けプレゼン資料に使う。明るく、わかりやすく、文字は入れない。"></textarea>
+      <textarea
+        id="extraText"
+        placeholder="例：高校生向けプレゼン資料に使う。明るく、わかりやすく、文字は入れない。"
+      ></textarea>
 
       <div class="actions">
         <button class="primary" id="generateBtn">プロンプト生成</button>
@@ -310,14 +325,18 @@
 
   <script>
     // =====================================================
-    // ここにSupabaseの情報を貼り付けてください
-    // service_role key は絶対に使わないでください
+    // Supabase設定
+    // service_role key は絶対に使わないでください。
+    // GitHub Pagesなどの公開サイトでは anon public key のみ使用します。
     // =====================================================
     const SUPABASE_URL = "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprYWNndWhhYWJhcXRyamFhaGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTIxNjAsImV4cCI6MjA5NzcyODE2MH0.6BnIs9aq4pM9DKicbdiEBG95fvw4Oyihd4YW4_Q1U4c";
 
-    // すでに動作確認済みのSupabase Edge Function
+    // Supabase Edge Function
     const FUNCTION_URL = "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
+
+    // 正式テーブル名
+    const PERSONAS_TABLE = "artist_prompt_personas";
 
     let personas = [];
     let selectedPersona = null;
@@ -338,17 +357,39 @@
       return `${SUPABASE_URL}/rest/v1/${tableName}`;
     }
 
+    function escapeHtml(text) {
+      return String(text || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
     async function loadPersonas() {
       try {
         setStatus("Supabaseから絵師ペルソナを読み込んでいます。", "");
 
-        const url = `${getSupabaseRestUrl("artist_prompt_personas")}?select=id,name,system_instruction,is_active&is_active=eq.true&order=name.asc`;
+        if (
+          !SUPABASE_URL ||
+          !SUPABASE_ANON_KEY ||
+          SUPABASE_URL.includes("ここに") ||
+          SUPABASE_ANON_KEY.includes("ここに")
+        ) {
+          throw new Error("SUPABASE_URL または SUPABASE_ANON_KEY が未設定です。");
+        }
+
+        const url =
+          `${getSupabaseRestUrl(PERSONAS_TABLE)}` +
+          `?select=id,name,system_instruction,is_active` +
+          `&is_active=eq.true` +
+          `&order=name.asc`;
 
         const response = await fetch(url, {
           method: "GET",
           headers: {
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
             "Content-Type": "application/json"
           }
         });
@@ -366,7 +407,7 @@
           personaGrid.innerHTML = `
             <div class="empty-box">
               有効な絵師ペルソナが見つかりません。<br>
-              Supabaseの personas テーブルに is_active = true のデータを登録してください。
+              Supabaseの artist_prompt_personas テーブルに is_active = true のデータを登録してください。
             </div>
           `;
           setStatus("有効な絵師ペルソナがありません。", "warning");
@@ -380,7 +421,7 @@
         personaGrid.innerHTML = `
           <div class="empty-box">
             絵師ペルソナの読み込みに失敗しました。<br>
-            Supabase URL、anon public key、RLS設定を確認してください。
+            確認項目：Supabase URL、anon public key、RLS設定、テーブル名 artist_prompt_personas
           </div>
         `;
         setStatus(`読み込みエラー：${error.message}`, "error");
@@ -400,7 +441,7 @@
         }
 
         const shortInstruction = persona.system_instruction
-          ? persona.system_instruction.slice(0, 60) + (persona.system_instruction.length > 60 ? "..." : "")
+          ? persona.system_instruction.slice(0, 70) + (persona.system_instruction.length > 70 ? "..." : "")
           : "説明未設定";
 
         button.innerHTML = `
@@ -411,19 +452,11 @@
         button.addEventListener("click", () => {
           selectedPersona = persona;
           renderPersonas();
+          setStatus(`絵師「${persona.name}」を選択しました。`, "success");
         });
 
         personaGrid.appendChild(button);
       });
-    }
-
-    function escapeHtml(text) {
-      return String(text || "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
     }
 
     async function generatePrompt() {
