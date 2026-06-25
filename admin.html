@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Artist Prompt Studio Admin</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-light: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --accent2: #a78bfa;
+      --border: #334155;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(167, 139, 250, 0.18), transparent 32%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 30px 20px 16px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: clamp(26px, 5vw, 42px);
+      letter-spacing: 0.04em;
+    }
+
+    header p {
+      margin: 12px auto 0;
+      color: var(--muted);
+      max-width: 860px;
+      line-height: 1.7;
+    }
+
+    main {
+      width: min(1280px, calc(100% - 32px));
+      margin: 24px auto 48px;
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: rgba(17, 24, 39, 0.88);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 22px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(12px);
+    }
+
+    h2, h3 {
+      margin-top: 0;
+    }
+
+    label {
+      display: block;
+      font-weight: 700;
+      margin: 16px 0 8px;
+      color: #e5e7eb;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel-light);
+      color: var(--text);
+      padding: 11px 13px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 140px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+      margin-top: 6px;
+    }
+
+    .tabs {
+      display: grid;
+      gap: 10px;
+    }
+
+    .tab-button {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--panel-light);
+      color: var(--text);
+      padding: 12px;
+      cursor: pointer;
+      text-align: left;
+      font-weight: 800;
+    }
+
+    .tab-button.active {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(167, 139, 250, 0.18));
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    button {
+      border: none;
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: 0.18s ease;
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #020617;
+    }
+
+    .secondary {
+      background: #334155;
+      color: var(--text);
+    }
+
+    .danger {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .small {
+      padding: 7px 11px;
+      font-size: 13px;
+      background: #334155;
+      color: var(--text);
+    }
+
+    .status {
+      margin-top: 14px;
+      min-height: 24px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .status.success {
+      color: var(--success);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .status.warning {
+      color: var(--warning);
+    }
+
+    .list {
+      display: grid;
+      gap: 10px;
+      margin-top: 18px;
+    }
+
+    .item {
+      border: 1px solid var(--border);
+      background: rgba(31, 41, 55, 0.72);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .item-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .item strong {
+      display: block;
+      font-size: 16px;
+      margin-bottom: 5px;
+    }
+
+    .item .meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .preview-img {
+      width: 84px;
+      height: 84px;
+      border-radius: 14px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      background: #020617;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .login-box {
+      max-width: 520px;
+      margin: 24px auto 48px;
+    }
+
+    @media (max-width: 980px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .two-col {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Artist Prompt Studio Admin</h1>
+    <p>
+      絵師ペルソナ、キャラクターカテゴリ、キャラクター設定を管理します。
+      service_role key はEdge Function側だけで使用します。
+    </p>
+  </header>
+
+  <section class="card login-box" id="loginSection">
+    <h2>管理ログイン</h2>
+    <p class="hint">
+      Supabase Edge FunctionのSecretに設定した ADMIN_PASSWORD を入力してください。
+    </p>
+
+    <label for="adminPassword">管理パスワード</label>
+    <input id="adminPassword" type="password" placeholder="ADMIN_PASSWORD" />
+
+    <div class="actions">
+      <button class="primary" id="loginBtn">ログイン</button>
+    </div>
+
+    <div class="status" id="loginStatus"></div>
+  </section>
+
+  <main id="adminMain" class="hidden">
+    <aside class="card">
+      <h2>管理メニュー</h2>
+
+      <div class="tabs">
+        <button class="tab-button active" data-tab="personas">絵師ペルソナ</button>
+        <button class="tab-button" data-tab="categories">キャラクターカテゴリ</button>
+        <button class="tab-button" data-tab="characters">キャラクター</button>
+      </div>
+
+      <div class="actions">
+        <button class="secondary" id="reloadBtn">再読み込み</button>
+        <button class="danger" id="logoutBtn">ログアウト</button>
+      </div>
+
+      <div class="status" id="globalStatus"></div>
+    </aside>
+
+    <section class="card">
+      <div id="personasPanel">
+        <h2>絵師ペルソナ管理</h2>
+        <p class="hint">
+          index.htmlで選択できる絵師ペルソナを管理します。
+        </p>
+
+        <div class="form-grid">
+          <input type="hidden" id="personaId" />
+
+          <label for="personaName">絵師名</label>
+          <input id="personaName" placeholder="例：アオハル" />
+
+          <label for="personaInstruction">system_instruction</label>
+          <textarea id="personaInstruction" placeholder="絵師ペルソナの特徴、画風、構図、色、雰囲気など"></textarea>
+
+          <label>
+            <input id="personaIsActive" type="checkbox" checked style="width:auto; margin-right:8px;" />
+            有効にする
+          </label>
+
+          <div class="actions">
+            <button class="primary" id="savePersonaBtn">保存</button>
+            <button class="secondary" id="newPersonaBtn">新規入力</button>
+          </div>
+        </div>
+
+        <div class="list" id="personaList"></div>
+      </div>
+
+      <div id="categoriesPanel" class="hidden">
+        <h2>キャラクターカテゴリ管理</h2>
+        <p class="hint">
+          キャラクターを分類するカテゴリを管理します。
+        </p>
+
+        <div class="form-grid">
+          <input type="hidden" id="categoryId" />
+
+          <label for="categoryName">カテゴリ名</label>
+          <input id="categoryName" placeholder="例：NaganoCo" />
+
+          <div class="actions">
+            <button class="primary" id="saveCategoryBtn">保存</button>
+            <button class="secondary" id="newCategoryBtn">新規入力</button>
+          </div>
+        </div>
+
+        <div class="list" id="categoryList"></div>
+      </div>
+
+      <div id="charactersPanel" class="hidden">
+        <h2>キャラクター管理</h2>
+        <p class="hint">
+          キャラクター名、基本プロンプト、Private Storage内の画像パスを管理します。
+        </p>
+
+        <div class="form-grid">
+          <input type="hidden" id="characterId" />
+
+          <div class="two-col">
+            <div>
+              <label for="characterName">キャラクター名</label>
+              <input id="characterName" placeholder="例：ナガノAI" />
+            </div>
+
+            <div>
+              <label for="characterCategory">カテゴリ</label>
+              <select id="characterCategory"></select>
+            </div>
+          </div>
+
+          <label for="characterBasePrompt">base_prompt</label>
+          <textarea id="characterBasePrompt" placeholder="キャラクター設定、外見、性格、役割など"></textarea>
+
+          <label for="characterImageUrl">image_url / Storage内パス</label>
+          <input id="characterImageUrl" placeholder="例：NaganoCo/nagano-ai.png" />
+          <p class="hint">
+            character_images バケット内のパスを入力します。画像アップロードは次フェーズで追加します。
+          </p>
+
+          <div class="actions">
+            <button class="primary" id="saveCharacterBtn">保存</button>
+            <button class="secondary" id="newCharacterBtn">新規入力</button>
+          </div>
+        </div>
+
+        <div class="list" id="characterList"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const ADMIN_API_URL =
+      "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-admin-api";
+
+    const SIGNED_IMAGE_URL_FUNCTION =
+      "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-character-image-url";
+
+    let adminPassword = "";
+    let currentTab = "personas";
+
+    let personas = [];
+    let categories = [];
+    let characters = [];
+
+    const loginSection = document.getElementById("loginSection");
+    const adminMain = document.getElementById("adminMain");
+
+    const loginStatus = document.getElementById("loginStatus");
+    const globalStatus = document.getElementById("globalStatus");
+
+    const adminPasswordInput = document.getElementById("adminPassword");
+    const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const reloadBtn = document.getElementById("reloadBtn");
+
+    const personasPanel = document.getElementById("personasPanel");
+    const categoriesPanel = document.getElementById("categoriesPanel");
+    const charactersPanel = document.getElementById("charactersPanel");
+
+    const personaList = document.getElementById("personaList");
+    const categoryList = document.getElementById("categoryList");
+    const characterList = document.getElementById("characterList");
+
+    const personaId = document.getElementById("personaId");
+    const personaName = document.getElementById("personaName");
+    const personaInstruction = document.getElementById("personaInstruction");
+    const personaIsActive = document.getElementById("personaIsActive");
+
+    const categoryId = document.getElementById("categoryId");
+    const categoryName = document.getElementById("categoryName");
+
+    const characterId = document.getElementById("characterId");
+    const characterName = document.getElementById("characterName");
+    const characterCategory = document.getElementById("characterCategory");
+    const characterBasePrompt = document.getElementById("characterBasePrompt");
+    const characterImageUrl = document.getElementById("characterImageUrl");
+
+    const savePersonaBtn = document.getElementById("savePersonaBtn");
+    const newPersonaBtn = document.getElementById("newPersonaBtn");
+
+    const saveCategoryBtn = document.getElementById("saveCategoryBtn");
+    const newCategoryBtn = document.getElementById("newCategoryBtn");
+
+    const saveCharacterBtn = document.getElementById("saveCharacterBtn");
+    const newCharacterBtn = document.getElementById("newCharacterBtn");
+
+    function setStatus(el, message, type = "") {
+      el.textContent = message;
+      el.className = `status ${type}`;
+    }
+
+    function escapeHtml(text) {
+      return String(text || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function getShortText(text, max = 120) {
+      const value = String(text || "");
+      return value.slice(0, max) + (value.length > max ? "..." : "");
+    }
+
+    async function adminRequest({ action, table, id = null, payload = null }) {
+      const response = await fetch(ADMIN_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-admin-password": adminPassword,
+        },
+        body: JSON.stringify({
+          action,
+          table,
+          id,
+          payload,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || data.error) {
+        throw new Error(data.error || "不明なエラーが発生しました。");
+      }
+
+      return data;
+    }
+
+    async function getSignedImageUrl(imagePath) {
+      if (!imagePath) return "";
+
+      if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+        return imagePath;
+      }
+
+      try {
+        const response = await fetch(SIGNED_IMAGE_URL_FUNCTION, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            path: imagePath,
+          }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          return "";
+        }
+
+        return data.signedUrl || "";
+      } catch {
+        return "";
+      }
+    }
+
+    async function login() {
+      const value = adminPasswordInput.value.trim();
+
+      if (!value) {
+        setStatus(loginStatus, "管理パスワードを入力してください。", "error");
+        return;
+      }
+
+      adminPassword = value;
+      setStatus(loginStatus, "認証確認中です...", "");
+
+      try {
+        await loadAllData();
+
+        loginSection.classList.add("hidden");
+        adminMain.classList.remove("hidden");
+
+        setStatus(globalStatus, "ログインしました。", "success");
+      } catch (error) {
+        adminPassword = "";
+        setStatus(loginStatus, `ログイン失敗：${error.message}`, "error");
+      }
+    }
+
+    function logout() {
+      adminPassword = "";
+      adminPasswordInput.value = "";
+      loginSection.classList.remove("hidden");
+      adminMain.classList.add("hidden");
+      setStatus(loginStatus, "ログアウトしました。", "warning");
+    }
+
+    async function loadAllData() {
+      const [personaResult, categoryResult, characterResult] = await Promise.all([
+        adminRequest({ action: "list", table: "personas" }),
+        adminRequest({ action: "list", table: "categories" }),
+        adminRequest({ action: "list", table: "characters" }),
+      ]);
+
+      personas = personaResult.data || [];
+      categories = categoryResult.data || [];
+      characters = characterResult.data || [];
+
+      renderPersonas();
+      renderCategories();
+      renderCategoryOptions();
+      await renderCharacters();
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+
+      document.querySelectorAll(".tab-button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === tab);
+      });
+
+      personasPanel.classList.toggle("hidden", tab !== "personas");
+      categoriesPanel.classList.toggle("hidden", tab !== "categories");
+      charactersPanel.classList.toggle("hidden", tab !== "characters");
+    }
+
+    function clearPersonaForm() {
+      personaId.value = "";
+      personaName.value = "";
+      personaInstruction.value = "";
+      personaIsActive.checked = true;
+    }
+
+    function clearCategoryForm() {
+      categoryId.value = "";
+      categoryName.value = "";
+    }
+
+    function clearCharacterForm() {
+      characterId.value = "";
+      characterName.value = "";
+      characterBasePrompt.value = "";
+      characterImageUrl.value = "";
+
+      if (categories.length > 0) {
+        characterCategory.value = categories[0].id;
+      }
+    }
+
+    function renderPersonas() {
+      personaList.innerHTML = "";
+
+      if (personas.length === 0) {
+        personaList.innerHTML = `<div class="item"><div class="meta">絵師ペルソナがありません。</div></div>`;
+        return;
+      }
+
+      personas.forEach((persona) => {
+        const item = document.createElement("div");
+        item.className = "item";
+
+        item.innerHTML = `
+          <div class="item-header">
+            <div>
+              <strong>${escapeHtml(persona.name)}</strong>
+              <div class="meta">有効：${persona.is_active ? "はい" : "いいえ"}</div>
+              <div class="meta">${escapeHtml(getShortText(persona.system_instruction, 180))}</div>
+            </div>
+            <div class="actions">
+              <button class="small" data-edit="${persona.id}">編集</button>
+              <button class="danger small" data-delete="${persona.id}">削除</button>
+            </div>
+          </div>
+        `;
+
+        item.querySelector("[data-edit]").addEventListener("click", () => {
+          personaId.value = persona.id;
+          personaName.value = persona.name || "";
+          personaInstruction.value = persona.system_instruction || "";
+          personaIsActive.checked = Boolean(persona.is_active);
+          switchTab("personas");
+          setStatus(globalStatus, "絵師ペルソナを編集モードにしました。", "success");
+        });
+
+        item.querySelector("[data-delete]").addEventListener("click", async () => {
+          if (!confirm(`絵師ペルソナ「${persona.name}」を削除しますか？`)) return;
+
+          try {
+            await adminRequest({
+              action: "delete",
+              table: "personas",
+              id: persona.id,
+            });
+
+            await loadAllData();
+            clearPersonaForm();
+            setStatus(globalStatus, "絵師ペルソナを削除しました。", "success");
+          } catch (error) {
+            setStatus(globalStatus, `削除エラー：${error.message}`, "error");
+          }
+        });
+
+        personaList.appendChild(item);
+      });
+    }
+
+    function renderCategories() {
+      categoryList.innerHTML = "";
+
+      if (categories.length === 0) {
+        categoryList.innerHTML = `<div class="item"><div class="meta">カテゴリがありません。</div></div>`;
+        return;
+      }
+
+      categories.forEach((category) => {
+        const item = document.createElement("div");
+        item.className = "item";
+
+        item.innerHTML = `
+          <div class="item-header">
+            <div>
+              <strong>${escapeHtml(category.name)}</strong>
+              <div class="meta">ID: ${escapeHtml(category.id)}</div>
+            </div>
+            <div class="actions">
+              <button class="small" data-edit="${category.id}">編集</button>
+              <button class="danger small" data-delete="${category.id}">削除</button>
+            </div>
+          </div>
+        `;
+
+        item.querySelector("[data-edit]").addEventListener("click", () => {
+          categoryId.value = category.id;
+          categoryName.value = category.name || "";
+          switchTab("categories");
+          setStatus(globalStatus, "カテゴリを編集モードにしました。", "success");
+        });
+
+        item.querySelector("[data-delete]").addEventListener("click", async () => {
+          if (!confirm(`カテゴリ「${category.name}」を削除しますか？`)) return;
+
+          try {
+            await adminRequest({
+              action: "delete",
+              table: "categories",
+              id: category.id,
+            });
+
+            await loadAllData();
+            clearCategoryForm();
+            setStatus(globalStatus, "カテゴリを削除しました。", "success");
+          } catch (error) {
+            setStatus(globalStatus, `削除エラー：${error.message}`, "error");
+          }
+        });
+
+        categoryList.appendChild(item);
+      });
+    }
+
+    function renderCategoryOptions() {
+      characterCategory.innerHTML = "";
+
+      if (categories.length === 0) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "カテゴリなし";
+        characterCategory.appendChild(option);
+        return;
+      }
+
+      categories.forEach((category) => {
+        const option = document.createElement("option");
+        option.value = category.id;
+        option.textContent = category.name;
+        characterCategory.appendChild(option);
+      });
+    }
+
+    async function renderCharacters() {
+      characterList.innerHTML = "";
+
+      if (characters.length === 0) {
+        characterList.innerHTML = `<div class="item"><div class="meta">キャラクターがありません。</div></div>`;
+        return;
+      }
+
+      for (const character of characters) {
+        const item = document.createElement("div");
+        item.className = "item";
+
+        const category = categories.find((cat) => cat.id === character.category_id);
+        const signedUrl = await getSignedImageUrl(character.image_url);
+
+        item.innerHTML = `
+          <div class="item-header">
+            <div style="display:flex; gap:12px; align-items:flex-start;">
+              ${
+                signedUrl
+                  ? `<img class="preview-img" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(character.name)}">`
+                  : `<div class="preview-img"></div>`
+              }
+              <div>
+                <strong>${escapeHtml(character.name)}</strong>
+                <div class="meta">カテゴリ：${escapeHtml(category ? category.name : "未設定")}</div>
+                <div class="meta">画像パス：${escapeHtml(character.image_url || "未設定")}</div>
+                <div class="meta">${escapeHtml(getShortText(character.base_prompt, 180))}</div>
+              </div>
+            </div>
+            <div class="actions">
+              <button class="small" data-edit="${character.id}">編集</button>
+              <button class="danger small" data-delete="${character.id}">削除</button>
+            </div>
+          </div>
+        `;
+
+        item.querySelector("[data-edit]").addEventListener("click", () => {
+          characterId.value = character.id;
+          characterName.value = character.name || "";
+          characterBasePrompt.value = character.base_prompt || "";
+          characterImageUrl.value = character.image_url || "";
+          characterCategory.value = character.category_id || "";
+          switchTab("characters");
+          setStatus(globalStatus, "キャラクターを編集モードにしました。", "success");
+        });
+
+        item.querySelector("[data-delete]").addEventListener("click", async () => {
+          if (!confirm(`キャラクター「${character.name}」を削除しますか？`)) return;
+
+          try {
+            await adminRequest({
+              action: "delete",
+              table: "characters",
+              id: character.id,
+            });
+
+            await loadAllData();
+            clearCharacterForm();
+            setStatus(globalStatus, "キャラクターを削除しました。", "success");
+          } catch (error) {
+            setStatus(globalStatus, `削除エラー：${error.message}`, "error");
+          }
+        });
+
+        characterList.appendChild(item);
+      }
+    }
+
+    async function savePersona() {
+      const payload = {
+        name: personaName.value.trim(),
+        system_instruction: personaInstruction.value.trim(),
+        is_active: personaIsActive.checked,
+      };
+
+      if (!payload.name) {
+        setStatus(globalStatus, "絵師名を入力してください。", "error");
+        return;
+      }
+
+      try {
+        const id = personaId.value;
+
+        await adminRequest({
+          action: id ? "update" : "create",
+          table: "personas",
+          id: id || null,
+          payload,
+        });
+
+        await loadAllData();
+        clearPersonaForm();
+        setStatus(globalStatus, "絵師ペルソナを保存しました。", "success");
+      } catch (error) {
+        setStatus(globalStatus, `保存エラー：${error.message}`, "error");
+      }
+    }
+
+    async function saveCategory() {
+      const payload = {
+        name: categoryName.value.trim(),
+      };
+
+      if (!payload.name) {
+        setStatus(globalStatus, "カテゴリ名を入力してください。", "error");
+        return;
+      }
+
+      try {
+        const id = categoryId.value;
+
+        await adminRequest({
+          action: id ? "update" : "create",
+          table: "categories",
+          id: id || null,
+          payload,
+        });
+
+        await loadAllData();
+        clearCategoryForm();
+        setStatus(globalStatus, "カテゴリを保存しました。", "success");
+      } catch (error) {
+        setStatus(globalStatus, `保存エラー：${error.message}`, "error");
+      }
+    }
+
+    async function saveCharacter() {
+      const payload = {
+        name: characterName.value.trim(),
+        base_prompt: characterBasePrompt.value.trim(),
+        image_url: characterImageUrl.value.trim(),
+        category_id: characterCategory.value || null,
+      };
+
+      if (!payload.name) {
+        setStatus(globalStatus, "キャラクター名を入力してください。", "error");
+        return;
+      }
+
+      try {
+        const id = characterId.value;
+
+        await adminRequest({
+          action: id ? "update" : "create",
+          table: "characters",
+          id: id || null,
+          payload,
+        });
+
+        await loadAllData();
+        clearCharacterForm();
+        setStatus(globalStatus, "キャラクターを保存しました。", "success");
+      } catch (error) {
+        setStatus(globalStatus, `保存エラー：${error.message}`, "error");
+      }
+    }
+
+    document.querySelectorAll(".tab-button").forEach((button) => {
+      button.addEventListener("click", () => {
+        switchTab(button.dataset.tab);
+      });
+    });
+
+    loginBtn.addEventListener("click", login);
+
+    adminPasswordInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        login();
+      }
+    });
+
+    logoutBtn.addEventListener("click", logout);
+
+    reloadBtn.addEventListener("click", async () => {
+      try {
+        await loadAllData();
+        setStatus(globalStatus, "再読み込みしました。", "success");
+      } catch (error) {
+        setStatus(globalStatus, `再読み込みエラー：${error.message}`, "error");
+      }
+    });
+
+    savePersonaBtn.addEventListener("click", savePersona);
+    newPersonaBtn.addEventListener("click", clearPersonaForm);
+
+    saveCategoryBtn.addEventListener("click", saveCategory);
+    newCategoryBtn.addEventListener("click", clearCategoryForm);
+
+    saveCharacterBtn.addEventListener("click", saveCharacter);
+    newCharacterBtn.addEventListener("click", clearCharacterForm);
+  </script>
+</body>
+</html>
