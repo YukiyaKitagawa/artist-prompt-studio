@@ -210,15 +210,34 @@
       flex-wrap: wrap;
     }
 
+    .mini-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+
     button.primary,
-    button.secondary {
+    button.secondary,
+    button.small {
       border: none;
       border-radius: 999px;
-      padding: 12px 20px;
       font-weight: 800;
       cursor: pointer;
-      font-size: 15px;
       transition: 0.18s ease;
+    }
+
+    button.primary,
+    button.secondary {
+      padding: 12px 20px;
+      font-size: 15px;
+    }
+
+    button.small {
+      padding: 8px 13px;
+      font-size: 13px;
+      background: #334155;
+      color: var(--text);
     }
 
     button.primary {
@@ -239,6 +258,7 @@
 
     button.primary:hover:not(:disabled),
     button.secondary:hover:not(:disabled),
+    button.small:hover:not(:disabled),
     .select-button:hover {
       transform: translateY(-1px);
     }
@@ -297,7 +317,7 @@
   <header>
     <h1>Artist Prompt Studio</h1>
     <p>
-      Supabaseに登録した絵師ペルソナと複数キャラクターを読み込み、Private Storage画像を一時URLで表示しながら、画像生成プロンプトを作成します。
+      Supabaseに登録した絵師ペルソナとキャラクターを読み込み、キャラクターあり・なしの両方に対応した画像生成プロンプトを作成します。
     </p>
   </header>
 
@@ -329,8 +349,13 @@
 
       <label>キャラクター</label>
       <div class="hint">
-        character_profiles から選択カテゴリのキャラクターを読み込みます。クリックで複数選択・解除できます。
+        character_profiles から選択カテゴリのキャラクターを読み込みます。キャラクターを使わない場合は未選択のまま生成できます。
       </div>
+
+      <div class="mini-actions">
+        <button class="small" id="clearCharactersBtn">キャラ選択を解除</button>
+      </div>
+
       <div class="grid" id="characterGrid">
         <div class="empty-box">キャラクターを読み込み中です...</div>
       </div>
@@ -338,18 +363,18 @@
       <label for="sceneText">作りたいシーン</label>
       <textarea
         id="sceneText"
-        placeholder="例：ナガノAIとナガノ玄が、未来的な建設現場で高校生に建設DXの魅力を説明している。周囲ではナガノAIエージェントたちがホログラム画面を操作してサポートしている。アスペクト比16:9。"
+        placeholder="例：未来的な建設現場でAIと建設DXの魅力を表現したプレゼン資料の表紙。アスペクト比16:9。"
       ></textarea>
 
       <label for="extraText">追加条件</label>
       <textarea
         id="extraText"
-        placeholder="例：プレゼン資料の表紙に使える明るいビジュアル。文字は入れない。AI感、建設現場のスケール感、親しみやすさを出す。"
+        placeholder="例：文字は入れない。AI感、建設現場のスケール感、親しみやすさを出す。"
       ></textarea>
 
       <div class="actions">
         <button class="primary" id="generateBtn">プロンプト生成</button>
-        <button class="secondary" id="clearBtn">クリア</button>
+        <button class="secondary" id="clearBtn">入力をクリア</button>
       </div>
 
       <div id="status" class="status"></div>
@@ -404,6 +429,7 @@
     const generateBtn = document.getElementById("generateBtn");
     const clearBtn = document.getElementById("clearBtn");
     const copyBtn = document.getElementById("copyBtn");
+    const clearCharactersBtn = document.getElementById("clearCharactersBtn");
 
     function setStatus(message, type = "") {
       statusEl.textContent = message;
@@ -470,8 +496,6 @@
     async function getSignedCharacterImageUrl(imagePath) {
       if (!imagePath) return "";
 
-      // 既存データ互換用。
-      // Private運用では、image_urlにはURLではなくStorage内パスを入れるのがおすすめです。
       if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
         return imagePath;
       }
@@ -614,8 +638,8 @@
         })
       );
 
-      // 初期状態では1体目を選択
-      selectedCharacters = [characters[0]];
+      // 初期状態は未選択にする
+      selectedCharacters = [];
 
       renderCharacters();
     }
@@ -662,18 +686,21 @@
           }
 
           renderCharacters();
-
-          const names = selectedCharacters.map(item => item.name).join("、");
-
-          if (selectedCharacters.length === 0) {
-            setStatus("キャラクターが未選択です。1体以上選択してください。", "warning");
-          } else {
-            setStatus(`選択中のキャラクター：${names}`, "success");
-          }
+          updateCharacterSelectionStatus();
         });
 
         characterGrid.appendChild(button);
       });
+    }
+
+    function updateCharacterSelectionStatus() {
+      if (selectedCharacters.length === 0) {
+        setStatus("キャラクター未選択です。キャラクターなしのプロンプトとして生成できます。", "warning");
+        return;
+      }
+
+      const names = selectedCharacters.map(item => item.name).join("、");
+      setStatus(`選択中のキャラクター：${names}`, "success");
     }
 
     async function loadInitialData() {
@@ -684,8 +711,7 @@
         await loadCategories();
         await loadCharacters();
 
-        const selectedNames = selectedCharacters.map(item => item.name).join("、");
-        setStatus(`絵師・カテゴリ・キャラクターを読み込みました。選択中：${selectedNames}`, "success");
+        setStatus("絵師・カテゴリ・キャラクターを読み込みました。キャラクターなしでも生成できます。", "success");
       } catch (error) {
         personaGrid.innerHTML = `
           <div class="empty-box">
@@ -707,24 +733,17 @@
       }
     }
 
-    async function generatePrompt() {
-      const modelName = document.getElementById("modelName").value;
-      const sceneText = document.getElementById("sceneText").value.trim();
-      const extraText = document.getElementById("extraText").value.trim();
-
-      if (!selectedPersona) {
-        setStatus("絵師ペルソナが選択されていません。", "error");
-        return;
-      }
-
+    function buildCharacterPromptBlock() {
       if (!selectedCharacters || selectedCharacters.length === 0) {
-        setStatus("キャラクターが選択されていません。1体以上選択してください。", "error");
-        return;
-      }
+        return `
+キャラクター指定：
+なし
 
-      if (!sceneText) {
-        setStatus("作りたいシーンを入力してください。", "error");
-        return;
+キャラクターに関する条件：
+- 特定キャラクターは使用しない
+- シーン内容に合う人物・動物・ロボット・アイコンなどは必要に応じて自然に提案してよい
+- ユーザーの指示にキャラクター名が含まれる場合のみ、その名前を尊重する
+`;
       }
 
       const selectedCharacterText = selectedCharacters
@@ -741,9 +760,37 @@ ${character.image_url || "未設定"}
         })
         .join("\n");
 
-      const characterPrompt = `
+      return `
 選択キャラクター一覧：
 ${selectedCharacterText}
+
+キャラクターに関する条件：
+- 実際の画像生成時にはキャラクター設定画像を添付する前提なので、キャラクターの細かな容姿説明はしすぎない
+- 複数キャラクターが選択されている場合は、それぞれの役割、位置関係、表情、行動を明確にする
+- キャラクター名を主語として使う
+- キャラクター同士の関係性が伝わる構図にする
+`;
+    }
+
+    async function generatePrompt() {
+      const modelName = document.getElementById("modelName").value;
+      const sceneText = document.getElementById("sceneText").value.trim();
+      const extraText = document.getElementById("extraText").value.trim();
+
+      if (!selectedPersona) {
+        setStatus("絵師ペルソナが選択されていません。", "error");
+        return;
+      }
+
+      if (!sceneText) {
+        setStatus("作りたいシーンを入力してください。", "error");
+        return;
+      }
+
+      const characterPromptBlock = buildCharacterPromptBlock();
+
+      const characterPrompt = `
+${characterPromptBlock}
 
 ユーザーが作りたいシーン：
 ${sceneText}
@@ -754,12 +801,9 @@ ${extraText || "なし"}
 出力条件：
 - 画像生成AIにそのまま貼り付けやすい英語プロンプトを作成する
 - その下に、学習用として日本語プロンプトも作成する
-- 実際の画像生成時にはキャラクター設定画像を添付する前提なので、キャラクターの細かな容姿説明はしすぎない
-- 複数キャラクターが選択されている場合は、それぞれの役割、位置関係、表情、行動を明確にする
-- キャラクター名を主語として使う
-- キャラクター同士の関係性が伝わる構図にする
 - 画風、構図、背景、ライティング、雰囲気、用途を明確にする
 - 必要に応じて「16:9」などの構図指定も含める
+- 文字を入れない指定がある場合は、no text, no captions, no logos, no readable letters を明記する
 `;
 
       generateBtn.disabled = true;
@@ -818,15 +862,19 @@ ${extraText || "なし"}
       setStatus("", "");
     }
 
+    function clearCharacterSelection() {
+      selectedCharacters = [];
+      renderCharacters();
+      setStatus("キャラ選択を解除しました。キャラクターなしで生成できます。", "warning");
+    }
+
     categorySelect.addEventListener("change", async () => {
       selectedCategoryId = categorySelect.value;
       characterGrid.innerHTML = `<div class="empty-box">キャラクターを読み込み中です...</div>`;
 
       try {
         await loadCharacters();
-
-        const selectedNames = selectedCharacters.map(item => item.name).join("、");
-        setStatus(`キャラクター一覧を更新しました。選択中：${selectedNames}`, "success");
+        setStatus("キャラクター一覧を更新しました。キャラクターなしでも生成できます。", "success");
       } catch (error) {
         characterGrid.innerHTML = `
           <div class="empty-box">
@@ -841,6 +889,7 @@ ${extraText || "なし"}
     generateBtn.addEventListener("click", generatePrompt);
     copyBtn.addEventListener("click", copyResult);
     clearBtn.addEventListener("click", clearForm);
+    clearCharactersBtn.addEventListener("click", clearCharacterSelection);
 
     loadInitialData();
   </script>
