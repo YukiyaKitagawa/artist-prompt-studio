@@ -537,15 +537,16 @@
       </div>
 
       <div class="section-block">
-        <h3>無し設定</h3>
+        <h3>文字・ロゴ制御</h3>
         <p class="hint">
-          必要なものだけ選択してください。選択した項目のみプロンプトに反映します。
+          ここで選ぶ制御は、背景の不要な文字や無関係なロゴを抑えるためのものです。
+          キャラクター設定に含まれる服装ロゴ、社名、ヘルメット文字、ワッペン、安全標語などはキャラクター固有のデザインとして優先します。
         </p>
 
         <div class="option-grid">
           <label class="check-card">
             <input type="checkbox" class="none-option" value="no_text" />
-            <span>文字なし / no text</span>
+            <span>不要な背景文字なし / no unnecessary background text</span>
           </label>
 
           <label class="check-card">
@@ -555,17 +556,17 @@
 
           <label class="check-card">
             <input type="checkbox" class="none-option" value="no_logos" />
-            <span>ロゴなし / no logos</span>
+            <span>無関係なロゴなし / no unrelated logos</span>
           </label>
 
           <label class="check-card">
             <input type="checkbox" class="none-option" value="no_readable_letters" />
-            <span>読める文字なし / no readable letters</span>
+            <span>キャラ設定以外の読める文字なし</span>
           </label>
 
           <label class="check-card">
             <input type="checkbox" class="none-option" value="no_text_except_title" />
-            <span>タイトル以外の文字なし</span>
+            <span>タイトルとキャラ設定以外の文字なし</span>
           </label>
         </div>
       </div>
@@ -611,7 +612,7 @@
         <h3>生成履歴</h3>
         <p class="hint">
           生成履歴はこのブラウザのlocalStorageに最大20件保存されます。
-          履歴ごとに、選択した絵師・キャラクター・カテゴリ・検索語・無し設定・共創パターン・入力文を含む設定込みJSONを出力できます。
+          履歴ごとに、選択した絵師・キャラクター・カテゴリ・検索語・文字制御・共創パターン・入力文を含む設定込みJSONを出力できます。
         </p>
 
         <div class="actions">
@@ -639,12 +640,16 @@
     const MAX_PERSONA_SELECTION = 2;
 
     const NONE_OPTION_LABELS = {
-      no_text: "no text / 文字なし",
-      no_captions: "no captions / キャプションなし",
-      no_logos: "no logos / ロゴなし",
-      no_readable_letters: "no readable letters / 読める文字なし",
+      no_text:
+        "no unnecessary background text / 不要な背景文字なし",
+      no_captions:
+        "no captions / キャプションなし",
+      no_logos:
+        "no unrelated logos / 無関係なロゴなし",
+      no_readable_letters:
+        "no readable text except character design markings / キャラ設定以外の読める文字なし",
       no_text_except_title:
-        "only the specified title text is allowed, no other text / タイトル以外の文字なし",
+        "only the specified title text and character design markings are allowed; no other text / タイトルとキャラ設定以外の文字なし",
     };
 
     const COLLAB_PATTERN_LABELS = {
@@ -803,21 +808,25 @@
             .from("artist_prompt_personas")
             .select("*")
             .eq("is_active", true)
+            .order("sort_order", { ascending: true })
             .order("name", { ascending: true }),
 
           supabaseClient
             .from("artist_persona_categories")
             .select("*")
+            .order("sort_order", { ascending: true })
             .order("name", { ascending: true }),
 
           supabaseClient
             .from("character_categories")
             .select("*")
+            .order("sort_order", { ascending: true })
             .order("name", { ascending: true }),
 
           supabaseClient
             .from("character_profiles")
             .select("*")
+            .order("sort_order", { ascending: true })
             .order("name", { ascending: true }),
         ]);
 
@@ -1305,10 +1314,20 @@ ${COLLAB_PATTERN_LABELS[pattern] || COLLAB_PATTERN_LABELS.auto}
       const lines = checkedValues.map((value) => `- ${NONE_OPTION_LABELS[value] || value}`);
 
       return `
-無し設定：
+文字・ロゴ制御：
 ${lines.join("\n")}
 
-上記の無し設定は必ず守ってください。
+キャラクター優先の文字ルール：
+- 選択キャラクター設定に含まれるロゴ、社名、ヘルメット文字、服の文字、ワッペン、安全標語、ラベル、装備上の表記は、キャラクター固有のデザイン要素として必ず保持してください。
+- 「不要な背景文字なし」「無関係なロゴなし」「キャプションなし」「キャラ設定以外の読める文字なし」が選択されている場合でも、その制限は不要な背景文字、字幕、説明文、透かし、署名、無関係なロゴ、ランダムな文字、看板の余計な文字にのみ適用してください。
+- ユーザーが明示的に削除を指示しない限り、キャラクター固有のロゴや文字は削除・置換しないでください。
+- 確認質問は行わず、キャラクター設定の文字・ロゴを優先してください。
+
+Character-priority text rule:
+- Logos, company names, helmet text, jacket text, badges, safety slogans, labels, and readable markings that are part of the selected character design must be preserved as character identity details.
+- When no unnecessary background text, no unrelated logos, no captions, or no readable text except character markings is selected, those restrictions apply only to unnecessary background text, captions, random signs, watermarks, signatures, unrelated logos, and extra readable text.
+- Do not remove or replace character-specific logos or markings unless the user explicitly says to remove them.
+- Do not ask for clarification. Character design markings take priority.
 `.trim();
     }
 
@@ -1331,6 +1350,10 @@ ${character.base_prompt || "未設定"}
 
 キャラクター画像パス：
 ${character.image_url || "未設定"}
+
+重要：
+このキャラクター設定に含まれるロゴ、服装文字、ヘルメット文字、ワッペン、社名、安全標語、装備上の表記はキャラクター固有のデザイン要素です。
+ユーザーが明示的に削除を指示しない限り、これらは保持してください。
 `.trim();
       });
 
@@ -1365,9 +1388,12 @@ ${persona.system_instruction || ""}
 - 日本語プロンプトは、English Promptの内容を確認しやすい日本語にしてください。
 - キャラクター名は、登録されている名称を尊重してください。
 - キャラクターのbase_promptがある場合は、外見・服装・役割・世界観を優先して反映してください。
+- キャラクター設定に含まれるロゴ、社名、ヘルメット文字、服の文字、ワッペン、安全標語、装備上の表記は、キャラクター固有のデザイン要素として優先してください。
+- 文字制御オプションが指定されている場合でも、キャラクター固有の文字・ロゴは削除対象ではありません。
+- 文字制御オプションは、背景の余計な文字、字幕、透かし、署名、無関係なロゴ、ランダム文字を抑制するためのものです。
 - 絵師ペルソナの胸像画像は、画面上で選択補助として使うための参考情報です。画像そのものを直接読んだ前提で断定しないでください。
 - 絵師ペルソナの画風は system_instruction を最優先で反映してください。
-- 文字なし等の無し設定がある場合は必ず守ってください。
+- 矛盾がある場合は確認質問をせず、キャラクター固有デザインを優先してプロンプトを完成させてください。
 
 ${personaInstructions.join("\n\n")}
 
@@ -1505,6 +1531,7 @@ ${buildNoneOptionsBlock()}
           categoryName: category ? category.name : "",
           imageUrl: persona.image_url || "",
           isActive: Boolean(persona.is_active),
+          sortOrder: persona.sort_order ?? null,
           systemInstruction: persona.system_instruction || "",
           missingFromCurrentDatabase: false,
         };
@@ -1532,7 +1559,10 @@ ${buildNoneOptionsBlock()}
           categoryId: character.category_id || null,
           categoryName: category ? category.name : "",
           imageUrl: character.image_url || "",
+          sortOrder: character.sort_order ?? null,
           basePrompt: character.base_prompt || "",
+          characterDesignTextPriority:
+            "Character-specific logos, labels, helmet text, jacket text, badges, safety slogans, and markings should be preserved unless explicitly removed.",
           missingFromCurrentDatabase: false,
         };
       });
@@ -1575,12 +1605,14 @@ ${buildNoneOptionsBlock()}
           collabPattern: item.collabPattern || "auto",
           collabPatternLabel:
             COLLAB_PATTERN_LABELS[item.collabPattern] || COLLAB_PATTERN_LABELS.auto,
-          noneOptions: noneOptions.map((value) => {
+          textAndLogoControls: noneOptions.map((value) => {
             return {
               value,
               label: NONE_OPTION_LABELS[value] || value,
             };
           }),
+          characterTextPriorityRule:
+            "Text/logo controls apply only to unnecessary background text, captions, watermarks, signatures, random signs, unrelated logos, and extra readable text. Character-specific logos and markings must be preserved.",
         },
         outputs: {
           englishPrompt: item.englishPrompt || "",
@@ -1677,7 +1709,7 @@ ${buildNoneOptionsBlock()}
 絵師：${escapeHtml(personaNames)}
 キャラクター：${escapeHtml(characterNames)}
 共創パターン：${escapeHtml(COLLAB_PATTERN_LABELS[item.collabPattern] || item.collabPattern || "auto")}
-無し設定：${escapeHtml(noneOptionText)}
+文字・ロゴ制御：${escapeHtml(noneOptionText)}
           </div>
           <div class="actions">
             <button class="secondary small" data-show="${escapeHtml(item.id)}">結果を表示</button>
