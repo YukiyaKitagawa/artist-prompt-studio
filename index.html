@@ -16,6 +16,7 @@
       --border: #334155;
       --success: #22c55e;
       --danger: #ef4444;
+      --warning: #f59e0b;
     }
 
     * {
@@ -132,11 +133,13 @@
       cursor: pointer;
       text-align: left;
       transition: 0.18s ease;
+      min-height: 92px;
     }
 
     .persona-button strong {
       display: block;
       margin-bottom: 4px;
+      font-size: 16px;
     }
 
     .persona-button span {
@@ -149,6 +152,15 @@
       border-color: var(--accent);
       background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(167, 139, 250, 0.18));
       box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+    }
+
+    .empty-box {
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      padding: 16px;
+      color: var(--muted);
+      line-height: 1.7;
+      background: rgba(31, 41, 55, 0.5);
     }
 
     .actions {
@@ -196,6 +208,7 @@
       font-size: 14px;
       min-height: 22px;
       color: var(--muted);
+      line-height: 1.6;
     }
 
     .status.success {
@@ -204,6 +217,10 @@
 
     .status.error {
       color: var(--danger);
+    }
+
+    .status.warning {
+      color: var(--warning);
     }
 
     .result-box {
@@ -240,8 +257,7 @@
   <header>
     <h1>Artist Prompt Studio</h1>
     <p>
-      絵師ペルソナとGeminiモデルを選び、キャラクターとシーンに合わせた画像生成プロンプトを作成します。
-      まずは最小構成版です。
+      Supabaseに登録した絵師ペルソナを読み込み、キャラクターとシーンに合わせた画像生成プロンプトを作成します。
     </p>
   </header>
 
@@ -259,7 +275,10 @@
       <div class="hint">標準は、動作確認済みの Gemini 2.5 Flash にしています。</div>
 
       <label>絵師ペルソナ</label>
-      <div class="persona-grid" id="personaGrid"></div>
+      <div class="hint">Supabaseの personas テーブルから is_active = true の絵師を読み込みます。</div>
+      <div class="persona-grid" id="personaGrid">
+        <div class="empty-box">絵師ペルソナを読み込み中です...</div>
+      </div>
 
       <label for="characterName">キャラクター名</label>
       <input id="characterName" type="text" value="ナガノAI" placeholder="例：ナガノAI、ナガノ玄、ナガノAIエージェント" />
@@ -290,52 +309,18 @@
   </main>
 
   <script>
+    // =====================================================
+    // ここにSupabaseの情報を貼り付けてください
+    // service_role key は絶対に使わないでください
+    // =====================================================
+    const SUPABASE_URL = "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprYWNndWhhYWJhcXRyamFhaGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTIxNjAsImV4cCI6MjA5NzcyODE2MH0.6BnIs9aq4pM9DKicbdiEBG95fvw4Oyihd4YW4_Q1U4c";
+
+    // すでに動作確認済みのSupabase Edge Function
     const FUNCTION_URL = "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
 
-    const personas = [
-      {
-        id: "aoharu",
-        name: "アオハル",
-        label: "現代アニメ・ライトノベル風",
-        description: "明るい表情、青春感、親しみやすさ",
-        systemInstruction:
-          "あなたは現代アニメ・ライトノベル風のイラストレーター『アオハル』です。高校生に親しみやすく、明るく、表情豊かで、キャラクターの魅力が伝わる画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
-      },
-      {
-        id: "neon",
-        name: "ネオン",
-        label: "サイバーパンク・SFコンセプト",
-        description: "近未来感、ホログラム、AI感",
-        systemInstruction:
-          "あなたはサイバーパンク・SFコンセプトアーティスト『ネオン』です。建設業とAI、DX、ホログラム、ネオンライト、未来的なUIを組み合わせ、かっこよく高密度な画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
-      },
-      {
-        id: "emogra",
-        name: "エモグラ",
-        label: "日常系・エモーショナル",
-        description: "夕暮れ、光、空気感、物語性",
-        systemInstruction:
-          "あなたは日常系・エモーショナルイラストレーター『エモグラ』です。働くことの尊さ、現場の温かさ、空や光の美しさ、進路に悩む高校生の心に響く情景を重視した画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
-      },
-      {
-        id: "street",
-        name: "ストリート",
-        label: "フラットデザイン・ストリートポップ",
-        description: "SNS映え、太い主線、ビビッド配色",
-        systemInstruction:
-          "あなたはフラットデザイン・ストリートポップ絵師『ストリート』です。太い主線、ビビッドな配色、ステッカー風、プレゼン資料やSNSで目を引くポップな構成を重視した画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
-      },
-      {
-        id: "polygon",
-        name: "ポリゴン",
-        label: "ハイエンド3D・ゲームグラフィック",
-        description: "高精細3D、質感、ゲーム的没入感",
-        systemInstruction:
-          "あなたはハイエンド3D・ゲームグラフィッククリエイター『ポリゴン』です。Unreal Engine風、リアルな質感、立体感、金属光沢、毛並み、被写界深度、ゲームパッケージのような迫力を重視した画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
-      }
-    ];
-
-    let selectedPersona = personas[0];
+    let personas = [];
+    let selectedPersona = null;
 
     const personaGrid = document.getElementById("personaGrid");
     const statusEl = document.getElementById("status");
@@ -344,6 +329,64 @@
     const clearBtn = document.getElementById("clearBtn");
     const copyBtn = document.getElementById("copyBtn");
 
+    function setStatus(message, type = "") {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type}`;
+    }
+
+    function getSupabaseRestUrl(tableName) {
+      return `${SUPABASE_URL}/rest/v1/${tableName}`;
+    }
+
+    async function loadPersonas() {
+      try {
+        setStatus("Supabaseから絵師ペルソナを読み込んでいます。", "");
+
+        const url = `${getSupabaseRestUrl("artist_prompt_personas")}?select=id,name,system_instruction,is_active&is_active=eq.true&order=name.asc`;
+
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "Content-Type": "application/json"
+          }
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || "Supabaseから絵師ペルソナを取得できませんでした。");
+        }
+
+        personas = data;
+
+        if (!Array.isArray(personas) || personas.length === 0) {
+          selectedPersona = null;
+          personaGrid.innerHTML = `
+            <div class="empty-box">
+              有効な絵師ペルソナが見つかりません。<br>
+              Supabaseの personas テーブルに is_active = true のデータを登録してください。
+            </div>
+          `;
+          setStatus("有効な絵師ペルソナがありません。", "warning");
+          return;
+        }
+
+        selectedPersona = personas[0];
+        renderPersonas();
+        setStatus(`絵師ペルソナを ${personas.length} 件読み込みました。`, "success");
+      } catch (error) {
+        personaGrid.innerHTML = `
+          <div class="empty-box">
+            絵師ペルソナの読み込みに失敗しました。<br>
+            Supabase URL、anon public key、RLS設定を確認してください。
+          </div>
+        `;
+        setStatus(`読み込みエラー：${error.message}`, "error");
+      }
+    }
+
     function renderPersonas() {
       personaGrid.innerHTML = "";
 
@@ -351,13 +394,18 @@
         const button = document.createElement("button");
         button.type = "button";
         button.className = "persona-button";
-        if (persona.id === selectedPersona.id) {
+
+        if (selectedPersona && persona.id === selectedPersona.id) {
           button.classList.add("active");
         }
 
+        const shortInstruction = persona.system_instruction
+          ? persona.system_instruction.slice(0, 60) + (persona.system_instruction.length > 60 ? "..." : "")
+          : "説明未設定";
+
         button.innerHTML = `
-          <strong>${persona.name}</strong>
-          <span>${persona.label}<br>${persona.description}</span>
+          <strong>${escapeHtml(persona.name)}</strong>
+          <span>${escapeHtml(shortInstruction)}</span>
         `;
 
         button.addEventListener("click", () => {
@@ -369,9 +417,13 @@
       });
     }
 
-    function setStatus(message, type = "") {
-      statusEl.textContent = message;
-      statusEl.className = `status ${type}`;
+    function escapeHtml(text) {
+      return String(text || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
     async function generatePrompt() {
@@ -379,6 +431,11 @@
       const characterName = document.getElementById("characterName").value.trim();
       const sceneText = document.getElementById("sceneText").value.trim();
       const extraText = document.getElementById("extraText").value.trim();
+
+      if (!selectedPersona) {
+        setStatus("絵師ペルソナが選択されていません。Supabaseの読み込み状態を確認してください。", "error");
+        return;
+      }
 
       if (!characterName) {
         setStatus("キャラクター名を入力してください。", "error");
@@ -419,7 +476,7 @@ ${extraText || "なし"}
             "Content-Type": "application/json"
           },
           body: JSON.stringify({
-            systemInstruction: selectedPersona.systemInstruction,
+            systemInstruction: selectedPersona.system_instruction,
             characterPrompt,
             modelName
           })
@@ -469,7 +526,7 @@ ${extraText || "なし"}
     copyBtn.addEventListener("click", copyResult);
     clearBtn.addEventListener("click", clearForm);
 
-    renderPersonas();
+    loadPersonas();
   </script>
 </body>
 </html>
