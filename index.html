@@ -85,7 +85,6 @@
     }
 
     select,
-    input,
     textarea {
       width: 100%;
       border: 1px solid var(--border);
@@ -104,7 +103,6 @@
     }
 
     select:focus,
-    input:focus,
     textarea:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
@@ -285,7 +283,7 @@
   <header>
     <h1>Artist Prompt Studio</h1>
     <p>
-      Supabaseに登録した絵師ペルソナとキャラクターを読み込み、選択した設定に合わせて画像生成プロンプトを作成します。
+      Supabaseに登録した絵師ペルソナとキャラクターを読み込み、Private Storageの画像を一時URLで表示しながら、画像生成プロンプトを作成します。
     </p>
   </header>
 
@@ -317,7 +315,7 @@
 
       <label>キャラクター</label>
       <div class="hint">
-        character_profiles から選択カテゴリのキャラクターを読み込みます。
+        character_profiles から選択カテゴリのキャラクターを読み込み、Private Storage画像は署名付きURLで表示します。
       </div>
       <div class="grid" id="characterGrid">
         <div class="empty-box">キャラクターを読み込み中です...</div>
@@ -363,8 +361,13 @@
     const SUPABASE_URL = "https://jkacguhaabaqtrjaahgl.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprYWNndWhhYWJhcXRyamFhaGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTIxNjAsImV4cCI6MjA5NzcyODE2MH0.6BnIs9aq4pM9DKicbdiEBG95fvw4Oyihd4YW4_Q1U4c";
 
-    // Supabase Edge Function
-    const FUNCTION_URL = "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
+    // プロンプト生成用 Edge Function
+    const FUNCTION_URL =
+      "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
+
+    // Private Storage画像の署名付きURL発行用 Edge Function
+    const CHARACTER_IMAGE_SIGN_URL_FUNCTION =
+      "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-character-image-url";
 
     // 正式テーブル名
     const PERSONAS_TABLE = "artist_prompt_personas";
@@ -448,6 +451,40 @@
       }
 
       return data;
+    }
+
+    async function getSignedCharacterImageUrl(imagePath) {
+      if (!imagePath) return "";
+
+      // 既存データ互換用。
+      // ただしPrivate運用では、image_urlにはURLではなくStorage内パスを入れるのがおすすめです。
+      if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+        return imagePath;
+      }
+
+      try {
+        const response = await fetch(CHARACTER_IMAGE_SIGN_URL_FUNCTION, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            path: imagePath
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          console.error("Signed URL error:", data);
+          return "";
+        }
+
+        return data.signedUrl || "";
+      } catch (error) {
+        console.error("Signed URL fetch error:", error);
+        return "";
+      }
     }
 
     async function loadPersonas() {
@@ -540,10 +577,9 @@
 
       const data = await fetchSupabase(CHARACTER_PROFILES_TABLE, query);
 
-      characters = data;
-
-      if (!Array.isArray(characters) || characters.length === 0) {
+      if (!Array.isArray(data) || data.length === 0) {
         selectedCharacter = null;
+        characters = [];
         characterGrid.innerHTML = `
           <div class="empty-box">
             このカテゴリにキャラクターが見つかりません。<br>
@@ -552,6 +588,17 @@
         `;
         return;
       }
+
+      characters = await Promise.all(
+        data.map(async (character) => {
+          const signedImageUrl = await getSignedCharacterImageUrl(character.image_url);
+
+          return {
+            ...character,
+            signed_image_url: signedImageUrl
+          };
+        })
+      );
 
       selectedCharacter = characters[0];
       renderCharacters();
@@ -569,8 +616,8 @@
           button.classList.add("active");
         }
 
-        const imagePart = character.image_url
-          ? `<img class="character-thumb" src="${escapeHtml(character.image_url)}" alt="${escapeHtml(character.name)}">`
+        const imagePart = character.signed_image_url
+          ? `<img class="character-thumb" src="${escapeHtml(character.signed_image_url)}" alt="${escapeHtml(character.name)}">`
           : `<div class="character-thumb placeholder">No Image</div>`;
 
         button.innerHTML = `
@@ -611,7 +658,7 @@
         characterGrid.innerHTML = `
           <div class="empty-box">
             キャラクターの読み込みに失敗しました。<br>
-            確認項目：character_categories、character_profiles、RLS設定
+            確認項目：character_categories、character_profiles、RLS設定、署名付きURL用Edge Function
           </div>
         `;
 
@@ -647,7 +694,7 @@
 キャラクター基本設定：
 ${selectedCharacter.base_prompt || "未設定"}
 
-キャラクター画像パスまたはURL：
+キャラクター画像パス：
 ${selectedCharacter.image_url || "未設定"}
 
 ユーザーが作りたいシーン：
@@ -731,7 +778,8 @@ ${extraText || "なし"}
       } catch (error) {
         characterGrid.innerHTML = `
           <div class="empty-box">
-            キャラクターの読み込みに失敗しました。
+            キャラクターの読み込みに失敗しました。<br>
+            確認項目：character_profiles、RLS設定、署名付きURL用Edge Function
           </div>
         `;
         setStatus(`キャラクター読み込みエラー：${error.message}`, "error");
