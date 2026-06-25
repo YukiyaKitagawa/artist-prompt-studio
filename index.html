@@ -585,6 +585,7 @@
         <div class="actions">
           <button class="primary" id="generateBtn">プロンプト生成</button>
           <button class="secondary" id="copyRequestBtn">API送信文をコピー</button>
+          <button class="secondary" id="exportRequestJsonBtn">設定付きJSON出力</button>
           <button class="secondary" id="clearInputBtn">入力をクリア</button>
         </div>
 
@@ -681,6 +682,8 @@
     let cooldownUntil = Number(localStorage.getItem(COOLDOWN_KEY) || 0);
     let cooldownTimer = null;
     let latestApiRequestText = "";
+    let latestApiRequestPayload = null;
+    let latestGenerationError = null;
 
     let personaRenderToken = 0;
     let characterRenderToken = 0;
@@ -708,6 +711,7 @@
 
     const generateBtn = document.getElementById("generateBtn");
     const copyRequestBtn = document.getElementById("copyRequestBtn");
+    const exportRequestJsonBtn = document.getElementById("exportRequestJsonBtn");
     const clearInputBtn = document.getElementById("clearInputBtn");
 
     const statusEl = document.getElementById("status");
@@ -839,9 +843,100 @@ ${characterPrompt}
 `.trim();
     }
 
-    function updateLatestApiRequestText(text) {
+    function buildApiRequestBundle({ systemInstruction, characterPrompt, errorMessage = "", waitSeconds = 0 }) {
+      const selectedPersonaIds = selectedPersonas.map((persona) => persona.id);
+      const selectedCharacterIds = selectedCharacters.map((character) => character.id);
+
+      const payload = {
+        schema: "artist_prompt_studio_api_request_v1",
+        exportedAt: new Date().toISOString(),
+        purpose: "Gemini API quota等でAPIを使えない場合に、チャットへ貼り付けてプロンプト生成するための設定付きJSONです。",
+        model: {
+          modelName: modelName.value,
+        },
+        apiRequest: {
+          endpoint: FUNCTION_URL,
+          body: {
+            systemInstruction,
+            characterPrompt,
+            modelName: modelName.value,
+          },
+        },
+        manualPrompt: buildManualPromptRequestText({
+          systemInstruction,
+          characterPrompt,
+        }),
+        filters: {
+          personaCategoryId: personaCategorySelect.value || "",
+          personaCategoryName: getPersonaCategoryNameById(personaCategorySelect.value) || "",
+          personaSearch: personaSearch.value || "",
+          characterCategoryId: categorySelect.value || "",
+          characterCategoryName: getCategoryNameById(categorySelect.value) || "",
+          characterSearch: characterSearch.value || "",
+        },
+        options: {
+          collabPattern: collabPattern.value || "auto",
+          collabPatternLabel: COLLAB_PATTERN_LABELS[collabPattern.value] || COLLAB_PATTERN_LABELS.auto,
+          noneOptions: getSelectedNoneOptions(),
+          noneOptionLabels: getSelectedNoneOptions().map((value) => NONE_OPTION_LABELS[value] || value),
+          cooldown: {
+            defaultCooldownSeconds: DEFAULT_COOLDOWN_SECONDS,
+            currentRemainingSeconds: getRemainingCooldownSeconds(),
+          },
+        },
+        selectedSettings: {
+          sceneText: sceneText.value || "",
+          extraText: extraText.value || "",
+          selectedPersonaIds,
+          selectedCharacterIds,
+          selectedPersonaNames: selectedPersonas.map((persona) => persona.name),
+          selectedCharacterNames: selectedCharacters.map((character) => character.name),
+        },
+        selectedPersonas: selectedPersonas.map((persona, index) => ({
+          slot: index === 0 ? "A" : "B",
+          id: persona.id,
+          name: persona.name,
+          categoryId: persona.category_id,
+          categoryName: getPersonaCategoryNameById(persona.category_id) || "",
+          imageUrl: persona.image_url || "",
+          isActive: Boolean(persona.is_active),
+          systemInstruction: persona.system_instruction || "",
+        })),
+        selectedCharacters: selectedCharacters.map((character) => ({
+          id: character.id,
+          name: character.name,
+          categoryId: character.category_id,
+          categoryName: getCategoryNameById(character.category_id) || "",
+          imageUrl: character.image_url || "",
+          basePrompt: character.base_prompt || "",
+        })),
+        error: errorMessage
+          ? {
+              type: isQuotaError(errorMessage) ? "quota" : "generation",
+              message: errorMessage,
+              waitSeconds,
+              occurredAt: new Date().toISOString(),
+            }
+          : null,
+        usage: {
+          copyTextTarget: "manualPrompt",
+          note: "APIを使わない場合は manualPrompt をGemini等のチャットへ貼り付けてください。設定を再現・検証したい場合は apiRequest.body と selectedSettings を参照してください。",
+        },
+      };
+
+      return payload;
+    }
+
+    function updateLatestApiRequestText(text, payload = null) {
       latestApiRequestText = text || "";
-      copyRequestBtn.disabled = !latestApiRequestText;
+
+      if (payload) {
+        latestApiRequestPayload = payload;
+      }
+
+      const hasRequest = Boolean(latestApiRequestText || latestApiRequestPayload);
+      copyRequestBtn.disabled = !hasRequest;
+      exportRequestJsonBtn.disabled = !hasRequest;
     }
 
     function escapeHtml(text) {
@@ -1654,7 +1749,7 @@ ${buildNoneOptionsBlock()}
         : [];
 
       const exportPersonas = selectedPersonaIds.map((idValue, index) => {
-        const persona = personas.find((item) => item.id === idValue);
+        const persona = personas.find((personaItem) => personaItem.id === idValue);
         const fallbackName = Array.isArray(item.selectedPersonaNames)
           ? item.selectedPersonaNames[index]
           : "";
@@ -1663,6 +1758,11 @@ ${buildNoneOptionsBlock()}
           return {
             id: idValue,
             name: fallbackName || "",
+            categoryId: null,
+            categoryName: "",
+            imageUrl: "",
+            isActive: false,
+            systemInstruction: "",
             missingFromCurrentDatabase: true,
           };
         }
@@ -1676,14 +1776,13 @@ ${buildNoneOptionsBlock()}
           categoryName: category ? category.name : "",
           imageUrl: persona.image_url || "",
           isActive: Boolean(persona.is_active),
-          sortOrder: persona.sort_order ?? null,
           systemInstruction: persona.system_instruction || "",
           missingFromCurrentDatabase: false,
         };
       });
 
       const exportCharacters = selectedCharacterIds.map((idValue, index) => {
-        const character = characters.find((item) => item.id === idValue);
+        const character = characters.find((characterItem) => characterItem.id === idValue);
         const fallbackName = Array.isArray(item.selectedCharacterNames)
           ? item.selectedCharacterNames[index]
           : "";
@@ -1692,6 +1791,10 @@ ${buildNoneOptionsBlock()}
           return {
             id: idValue,
             name: fallbackName || "",
+            categoryId: null,
+            categoryName: "",
+            imageUrl: "",
+            basePrompt: "",
             missingFromCurrentDatabase: true,
           };
         }
@@ -1704,10 +1807,7 @@ ${buildNoneOptionsBlock()}
           categoryId: character.category_id || null,
           categoryName: category ? category.name : "",
           imageUrl: character.image_url || "",
-          sortOrder: character.sort_order ?? null,
           basePrompt: character.base_prompt || "",
-          characterDesignTextPriority:
-            "Selected character-specific logos, labels, equipment markings, clothing text, badges, slogans, and identity markings should be preserved unless the user explicitly asks to remove them.",
           missingFromCurrentDatabase: false,
         };
       });
@@ -1715,18 +1815,18 @@ ${buildNoneOptionsBlock()}
       const noneOptions = Array.isArray(item.noneOptions) ? item.noneOptions : [];
 
       return {
-        schema: "artist_prompt_studio_history_settings_v2",
+        schema: "artist_prompt_studio_history_settings_v1",
         exportedAt: new Date().toISOString(),
         sourceApp: {
           name: "Artist Prompt Studio",
           storageKey: HISTORY_STORAGE_KEY,
         },
         history: {
-          id: item.id,
-          createdAt: item.createdAt,
+          id: item.id || crypto.randomUUID(),
+          createdAt: item.createdAt || new Date().toISOString(),
         },
         model: {
-          name: item.modelName || "",
+          name: item.modelName || modelName.value || "",
         },
         inputs: {
           sceneText: item.sceneText || "",
@@ -1750,27 +1850,19 @@ ${buildNoneOptionsBlock()}
           collabPattern: item.collabPattern || "auto",
           collabPatternLabel:
             COLLAB_PATTERN_LABELS[item.collabPattern] || COLLAB_PATTERN_LABELS.auto,
-          textAndLogoControls: noneOptions.map((value) => {
+          noneOptions: noneOptions.map((value) => {
             return {
               value,
               label: NONE_OPTION_LABELS[value] || value,
             };
           }),
-          stylePriorityRule:
-            "Artist personas define the dominant rendering style of the entire image. Character settings define subject identity and content details. The artist style should be strongly emphasized from the beginning of the final prompt.",
-          characterTextPriorityRule:
-            "Text/logo controls are internal. Final prompts should avoid prohibition phrases and should only mention visible character-specific markings positively when needed.",
-        },
-        outputs: {
-          englishPrompt: item.englishPrompt || "",
-          japanesePrompt: item.japanesePrompt || "",
         },
         restoreHints: {
           selectedPersonaIds,
           selectedCharacterIds,
           maxPersonaSelection: MAX_PERSONA_SELECTION,
           note:
-            "このJSONは設定込みの履歴出力です。別ツールで利用する場合は selectedSettings と outputs を参照してください。",
+            "このJSONは設定込みの履歴出力です。別ツールで利用する場合は inputs、uiState、selectedSettings、restoreHints を参照してください。生成結果本文は容量削減のため含めていません。",
         },
       };
     }
@@ -2029,10 +2121,14 @@ ${extra || "なし"}
 ${buildCharacterPromptBlock()}
 `.trim();
 
-      updateLatestApiRequestText(buildManualPromptRequestText({
+      latestGenerationError = null;
+
+      const requestPayload = buildApiRequestBundle({
         systemInstruction: combinedSystemInstruction,
         characterPrompt,
-      }));
+      });
+
+      updateLatestApiRequestText(requestPayload.manualPrompt, requestPayload);
 
       isGenerating = true;
       updateGenerateButtonState();
@@ -2091,6 +2187,8 @@ ${buildCharacterPromptBlock()}
         if (isQuotaError(message)) {
           const retrySeconds = extractRetrySecondsFromError(message);
           const waitSeconds = Math.max(retrySeconds, DEFAULT_COOLDOWN_SECONDS);
+
+          latestGenerationError = null;
 
           setCooldown(waitSeconds);
 
@@ -2154,13 +2252,63 @@ ${extra || "なし"}
 ${buildCharacterPromptBlock()}
 `.trim();
 
-        updateLatestApiRequestText(buildManualPromptRequestText({
+        const requestPayload = buildApiRequestBundle({
           systemInstruction: combinedSystemInstruction,
           characterPrompt,
-        }));
+          errorMessage: latestGenerationError?.message || "",
+          waitSeconds: latestGenerationError?.waitSeconds || 0,
+        });
+
+        updateLatestApiRequestText(requestPayload.manualPrompt, requestPayload);
       }
 
       await copyText(latestApiRequestText, "API送信文");
+    }
+
+    function createCurrentSettingsSnapshot() {
+      return {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        modelName: modelName.value,
+        sceneText: sceneText.value,
+        extraText: extraText.value,
+        personaCategoryId: personaCategorySelect.value,
+        personaSearch: personaSearch.value,
+        selectedPersonaIds: selectedPersonas.map((persona) => persona.id),
+        selectedPersonaNames: selectedPersonas.map((persona) => persona.name),
+        collabPattern: collabPattern.value,
+        characterCategoryId: categorySelect.value,
+        characterSearch: characterSearch.value,
+        selectedCharacterIds: selectedCharacters.map((character) => character.id),
+        selectedCharacterNames: selectedCharacters.map((character) => character.name),
+        noneOptions: getSelectedNoneOptions(),
+        englishPrompt: englishPrompt.textContent || "",
+        japanesePrompt: japanesePrompt.textContent || "",
+      };
+    }
+
+    function exportLatestApiRequestJson() {
+      const scene = sceneText.value.trim();
+
+      if (!scene) {
+        setStatus("出力する設定付きJSONがありません。先に作りたい画像の内容を入力してください。", "warning");
+        return;
+      }
+
+      const snapshot = createCurrentSettingsSnapshot();
+      const exportPayload = buildHistoryExportPayload(snapshot);
+
+      const createdAt = new Date()
+        .toISOString()
+        .replace(/[-:]/g, "")
+        .replace(/\.\d+Z$/, "")
+        .replace("T", "-");
+
+      const title = safeFileName(scene || selectedCharacters[0]?.name || "artist-prompt-settings");
+      const fileName = `artist-prompt-settings-${createdAt}-${title}.json`;
+
+      downloadJsonFile(fileName, exportPayload);
+      setStatus("設定込みJSONを出力しました。", "success");
     }
 
     function clearInputs() {
@@ -2196,6 +2344,8 @@ ${buildCharacterPromptBlock()}
     generateBtn.addEventListener("click", generatePrompt);
 
     copyRequestBtn.addEventListener("click", copyLatestApiRequestText);
+
+    exportRequestJsonBtn.addEventListener("click", exportLatestApiRequestJson);
 
     clearInputBtn.addEventListener("click", clearInputs);
 
