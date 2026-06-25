@@ -239,21 +239,6 @@
       font-weight: 800;
     }
 
-    .count-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-width: 28px;
-      height: 22px;
-      border-radius: 999px;
-      background: rgba(56, 189, 248, 0.18);
-      color: #bae6fd;
-      font-size: 12px;
-      font-weight: 800;
-      margin-left: 6px;
-      padding: 0 8px;
-    }
-
     .search-row {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -445,10 +430,7 @@
       <div class="section-block">
         <h3>キャラクター選択</h3>
 
-        <label for="categorySelect">
-          カテゴリ
-          <span class="count-badge" id="categoryCountBadge">0件</span>
-        </label>
+        <label for="categorySelect">カテゴリ</label>
         <select id="categorySelect"></select>
         <p class="hint">
           カテゴリを切り替えても、選択済みキャラクターは保持されます。
@@ -549,8 +531,8 @@
   </main>
 
   <script>
-    const SUPABASE_URL = "https://jkacguhaabaqtrjaahgl.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImprYWNndWhhYWJhcXRyamFhaGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIxNTIxNjAsImV4cCI6MjA5NzcyODE2MH0.6BnIs9aq4pM9DKicbdiEBG95fvw4Oyihd4YW4_Q1U4c";
+    const SUPABASE_URL = "ここにSupabase Project URLを貼り付け";
+    const SUPABASE_ANON_KEY = "ここにanon public keyを貼り付け";
 
     const FUNCTION_URL =
       "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
@@ -588,13 +570,14 @@
     let selectedPersonas = [];
     let selectedCharacters = [];
 
+    let characterRenderToken = 0;
+
     const modelName = document.getElementById("modelName");
     const personaGrid = document.getElementById("personaGrid");
     const selectedPersonaSummary = document.getElementById("selectedPersonaSummary");
     const collabPattern = document.getElementById("collabPattern");
 
     const categorySelect = document.getElementById("categorySelect");
-    const categoryCountBadge = document.getElementById("categoryCountBadge");
     const characterSearch = document.getElementById("characterSearch");
     const clearCharacterSearchBtn = document.getElementById("clearCharacterSearchBtn");
     const characterSearchInfo = document.getElementById("characterSearchInfo");
@@ -831,6 +814,8 @@
         option.textContent = `${category.name}（${count}件）`;
         categorySelect.appendChild(option);
       });
+
+      updateCategoryCount();
     }
 
     function getFilteredCharacters() {
@@ -870,15 +855,15 @@
       const keyword = normalizeSearchText(characterSearch.value);
 
       if (keyword) {
-        categoryCountBadge.textContent = `${filtered}/${total}件`;
         characterSearchInfo.textContent = `検索中：${filtered}件 / このカテゴリ全体：${total}件`;
       } else {
-        categoryCountBadge.textContent = `${total}件`;
-        characterSearchInfo.textContent = "検索語を入力すると、現在のカテゴリ内で絞り込みます。";
+        characterSearchInfo.textContent = `このカテゴリ全体：${total}件`;
       }
     }
 
     async function renderCharacters() {
+      const renderToken = ++characterRenderToken;
+
       characterGrid.innerHTML = "";
 
       const currentCategoryId = categorySelect.value;
@@ -895,7 +880,13 @@
         return;
       }
 
+      const fragment = document.createDocumentFragment();
+
       for (const character of filteredCharacters) {
+        if (renderToken !== characterRenderToken) {
+          return;
+        }
+
         const button = document.createElement("button");
         button.type = "button";
         button.className = "character-button";
@@ -906,6 +897,10 @@
         }
 
         const signedUrl = await getSignedImageUrl(character.image_url);
+
+        if (renderToken !== characterRenderToken) {
+          return;
+        }
 
         button.innerHTML = `
           ${
@@ -923,8 +918,15 @@
           toggleCharacter(character);
         });
 
-        characterGrid.appendChild(button);
+        fragment.appendChild(button);
       }
+
+      if (renderToken !== characterRenderToken) {
+        return;
+      }
+
+      characterGrid.innerHTML = "";
+      characterGrid.appendChild(fragment);
     }
 
     function toggleCharacter(character) {
