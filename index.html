@@ -584,6 +584,7 @@
 
         <div class="actions">
           <button class="primary" id="generateBtn">プロンプト生成</button>
+          <button class="secondary" id="copyRequestBtn">API送信文をコピー</button>
           <button class="secondary" id="clearInputBtn">入力をクリア</button>
         </div>
 
@@ -679,6 +680,7 @@
     let isGenerating = false;
     let cooldownUntil = Number(localStorage.getItem(COOLDOWN_KEY) || 0);
     let cooldownTimer = null;
+    let latestApiRequestText = "";
 
     let personaRenderToken = 0;
     let characterRenderToken = 0;
@@ -705,6 +707,7 @@
     const extraText = document.getElementById("extraText");
 
     const generateBtn = document.getElementById("generateBtn");
+    const copyRequestBtn = document.getElementById("copyRequestBtn");
     const clearInputBtn = document.getElementById("clearInputBtn");
 
     const statusEl = document.getElementById("status");
@@ -801,7 +804,7 @@
         return Math.ceil(Number(retryAfterMatch[1]));
       }
 
-      return 60;
+      return DEFAULT_COOLDOWN_SECONDS;
     }
 
     function isQuotaError(message) {
@@ -814,6 +817,31 @@
         text.includes("too many requests") ||
         text.includes("exceeded")
       );
+    }
+
+    function buildManualPromptRequestText({ systemInstruction, characterPrompt }) {
+      return `
+以下は、Artist Prompt Studio が Gemini API に送る直前のリクエスト文です。
+Gemini、ChatGPT、Claudeなどのチャットにそのまま貼り付けて、画像生成AI向けプロンプトを作成してください。
+
+【依頼】
+下記の System Instruction と User Input に従い、画像生成AIへそのまま入力できる完成プロンプトを作成してください。
+出力は「## English Prompt」と「## 日本語プロンプト」の2見出しだけにしてください。
+
+【想定モデル】
+${modelName.value}
+
+【System Instruction】
+${systemInstruction}
+
+【User Input】
+${characterPrompt}
+`.trim();
+    }
+
+    function updateLatestApiRequestText(text) {
+      latestApiRequestText = text || "";
+      copyRequestBtn.disabled = !latestApiRequestText;
     }
 
     function escapeHtml(text) {
@@ -1625,168 +1653,229 @@ ${buildNoneOptionsBlock()}
         ? item.selectedCharacterIds
         : [];
 
-      const restoredPersonas = selectedPersonaIds
-        .map((id) => personas.find((persona) => persona.id === id))
-        .filter(Boolean);
+      const exportPersonas = selectedPersonaIds.map((idValue, index) => {
+        const persona = personas.find((item) => item.id === idValue);
+        const fallbackName = Array.isArray(item.selectedPersonaNames)
+          ? item.selectedPersonaNames[index]
+          : "";
 
-      const restoredCharacters = selectedCharacterIds
-        .map((id) => characters.find((character) => character.id === id))
-        .filter(Boolean);
+        if (!persona) {
+          return {
+            id: idValue,
+            name: fallbackName || "",
+            missingFromCurrentDatabase: true,
+          };
+        }
+
+        const category = getPersonaCategoryById(persona.category_id);
+
+        return {
+          id: persona.id,
+          name: persona.name || "",
+          categoryId: persona.category_id || null,
+          categoryName: category ? category.name : "",
+          imageUrl: persona.image_url || "",
+          isActive: Boolean(persona.is_active),
+          sortOrder: persona.sort_order ?? null,
+          systemInstruction: persona.system_instruction || "",
+          missingFromCurrentDatabase: false,
+        };
+      });
+
+      const exportCharacters = selectedCharacterIds.map((idValue, index) => {
+        const character = characters.find((item) => item.id === idValue);
+        const fallbackName = Array.isArray(item.selectedCharacterNames)
+          ? item.selectedCharacterNames[index]
+          : "";
+
+        if (!character) {
+          return {
+            id: idValue,
+            name: fallbackName || "",
+            missingFromCurrentDatabase: true,
+          };
+        }
+
+        const category = getCharacterCategoryById(character.category_id);
+
+        return {
+          id: character.id,
+          name: character.name || "",
+          categoryId: character.category_id || null,
+          categoryName: category ? category.name : "",
+          imageUrl: character.image_url || "",
+          sortOrder: character.sort_order ?? null,
+          basePrompt: character.base_prompt || "",
+          characterDesignTextPriority:
+            "Selected character-specific logos, labels, equipment markings, clothing text, badges, slogans, and identity markings should be preserved unless the user explicitly asks to remove them.",
+          missingFromCurrentDatabase: false,
+        };
+      });
+
+      const noneOptions = Array.isArray(item.noneOptions) ? item.noneOptions : [];
 
       return {
         schema: "artist_prompt_studio_history_settings_v2",
         exportedAt: new Date().toISOString(),
-
+        sourceApp: {
+          name: "Artist Prompt Studio",
+          storageKey: HISTORY_STORAGE_KEY,
+        },
         history: {
           id: item.id,
           createdAt: item.createdAt,
-          createdAtLocal: formatHistoryDate(item.createdAt),
         },
-
         model: {
-          modelName: item.modelName || "",
+          name: item.modelName || "",
         },
-
-        filters: {
-          personaCategoryId: item.personaCategoryId || "",
-          personaCategoryName: getPersonaCategoryNameById(item.personaCategoryId) || "",
-          personaSearch: item.personaSearch || "",
-          characterCategoryId: item.characterCategoryId || "",
-          characterCategoryName: getCategoryNameById(item.characterCategoryId) || "",
-          characterSearch: item.characterSearch || "",
-        },
-
-        options: {
-          collabPattern: item.collabPattern || "auto",
-          collabPatternLabel: COLLAB_PATTERN_LABELS[item.collabPattern] || COLLAB_PATTERN_LABELS.auto,
-          noneOptions: Array.isArray(item.noneOptions) ? item.noneOptions : [],
-          noneOptionLabels: (Array.isArray(item.noneOptions) ? item.noneOptions : [])
-            .map((value) => NONE_OPTION_LABELS[value] || value),
-        },
-
-        selectedPersonas: restoredPersonas.map((persona, index) => {
-          const category = getPersonaCategoryById(persona.category_id);
-
-          return {
-            slot: index === 0 ? "A" : "B",
-            id: persona.id,
-            name: persona.name,
-            categoryId: persona.category_id,
-            categoryName: category ? category.name : "",
-            imageUrl: persona.image_url || "",
-            isActive: Boolean(persona.is_active),
-            systemInstruction: persona.system_instruction || "",
-          };
-        }),
-
-        selectedCharacters: restoredCharacters.map((character) => {
-          const category = getCharacterCategoryById(character.category_id);
-
-          return {
-            id: character.id,
-            name: character.name,
-            categoryId: character.category_id,
-            categoryName: category ? category.name : "",
-            imageUrl: character.image_url || "",
-            basePrompt: character.base_prompt || "",
-          };
-        }),
-
-        input: {
+        inputs: {
           sceneText: item.sceneText || "",
           extraText: item.extraText || "",
         },
-
-        output: {
+        uiState: {
+          personaCategoryId: item.personaCategoryId || "",
+          personaCategoryName: item.personaCategoryId
+            ? getPersonaCategoryNameById(item.personaCategoryId)
+            : "すべての絵師カテゴリ",
+          personaSearch: item.personaSearch || "",
+          characterCategoryId: item.characterCategoryId || "",
+          characterCategoryName: item.characterCategoryId
+            ? getCategoryNameById(item.characterCategoryId)
+            : "",
+          characterSearch: item.characterSearch || "",
+        },
+        selectedSettings: {
+          personas: exportPersonas,
+          characters: exportCharacters,
+          collabPattern: item.collabPattern || "auto",
+          collabPatternLabel:
+            COLLAB_PATTERN_LABELS[item.collabPattern] || COLLAB_PATTERN_LABELS.auto,
+          textAndLogoControls: noneOptions.map((value) => {
+            return {
+              value,
+              label: NONE_OPTION_LABELS[value] || value,
+            };
+          }),
+          stylePriorityRule:
+            "Artist personas define the dominant rendering style of the entire image. Character settings define subject identity and content details. The artist style should be strongly emphasized from the beginning of the final prompt.",
+          characterTextPriorityRule:
+            "Text/logo controls are internal. Final prompts should avoid prohibition phrases and should only mention visible character-specific markings positively when needed.",
+        },
+        outputs: {
           englishPrompt: item.englishPrompt || "",
           japanesePrompt: item.japanesePrompt || "",
+        },
+        restoreHints: {
+          selectedPersonaIds,
+          selectedCharacterIds,
+          maxPersonaSelection: MAX_PERSONA_SELECTION,
+          note:
+            "このJSONは設定込みの履歴出力です。別ツールで利用する場合は selectedSettings と outputs を参照してください。",
         },
       };
     }
 
-    function downloadJson(filename, data) {
-      const blob = new Blob([JSON.stringify(data, null, 2)], {
-        type: "application/json",
+    function downloadJsonFile(fileName, data) {
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], {
+        type: "application/json;charset=utf-8",
       });
 
       const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
+      const anchor = document.createElement("a");
 
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      anchor.href = url;
+      anchor.download = fileName;
+
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
 
       URL.revokeObjectURL(url);
     }
 
-    function renderHistory() {
-      const history = getHistory();
+    function exportHistorySettingsJson(id) {
+      const item = getHistory().find((historyItem) => historyItem.id === id);
 
+      if (!item) {
+        setStatus("出力対象の履歴が見つかりません。", "error");
+        return;
+      }
+
+      const payload = buildHistoryExportPayload(item);
+      const createdAt = String(item.createdAt || "")
+        .replace(/[-:]/g, "")
+        .replace(/\.\d+Z$/, "")
+        .replace("T", "-");
+
+      const title = safeFileName(item.sceneText || "artist-prompt-history");
+      const fileName = `artist-prompt-settings-${createdAt || "unknown"}-${title}.json`;
+
+      downloadJsonFile(fileName, payload);
+      setStatus("設定込みJSONを出力しました。", "success");
+    }
+
+    function renderHistory() {
+      const items = getHistory();
       historyList.innerHTML = "";
 
-      if (history.length === 0) {
+      if (items.length === 0) {
         historyList.innerHTML = `
           <div class="history-empty">
-            まだ生成履歴はありません。
+            生成履歴はまだありません。プロンプト生成に成功すると、ここに保存されます。
           </div>
         `;
         return;
       }
 
-      history.forEach((item) => {
+      items.forEach((item) => {
         const div = document.createElement("div");
         div.className = "history-item";
 
-        const personaNames = Array.isArray(item.selectedPersonaNames)
-          ? item.selectedPersonaNames.join(" / ")
-          : "";
+        const title = item.sceneText
+          ? getShortText(item.sceneText, 54)
+          : "無題の生成履歴";
 
-        const characterNames = Array.isArray(item.selectedCharacterNames)
-          ? item.selectedCharacterNames.join(" / ")
-          : "";
+        const personaNames = Array.isArray(item.selectedPersonaNames) && item.selectedPersonaNames.length > 0
+          ? item.selectedPersonaNames.join("、")
+          : "未選択";
 
-        const noneOptionLabels = Array.isArray(item.noneOptions)
-          ? item.noneOptions.map((value) => NONE_OPTION_LABELS[value] || value)
-          : [];
+        const characterNames = Array.isArray(item.selectedCharacterNames) && item.selectedCharacterNames.length > 0
+          ? item.selectedCharacterNames.join("、")
+          : "未選択";
+
+        const noneOptionText = Array.isArray(item.noneOptions) && item.noneOptions.length > 0
+          ? item.noneOptions.map((value) => NONE_OPTION_LABELS[value] || value).join("、")
+          : "なし";
 
         div.innerHTML = `
-          <strong>${escapeHtml(formatHistoryDate(item.createdAt))}</strong>
+          <strong>${escapeHtml(title)}</strong>
           <div class="history-meta">
+日時：${escapeHtml(formatHistoryDate(item.createdAt))}
 モデル：${escapeHtml(item.modelName || "")}
-絵師：${escapeHtml(personaNames || "未選択")}
-共創：${escapeHtml(COLLAB_PATTERN_LABELS[item.collabPattern] || "おまかせ統合")}
-キャラクター：${escapeHtml(characterNames || "未選択")}
-文字制御：${escapeHtml(noneOptionLabels.length ? noneOptionLabels.join(" / ") : "なし")}
-シーン：${escapeHtml(getShortText(item.sceneText, 120))}
+絵師：${escapeHtml(personaNames)}
+キャラクター：${escapeHtml(characterNames)}
+共創パターン：${escapeHtml(COLLAB_PATTERN_LABELS[item.collabPattern] || item.collabPattern || "auto")}
+文字・ロゴ制御：${escapeHtml(noneOptionText)}
           </div>
           <div class="actions">
-            <button class="secondary small" data-restore="${item.id}">設定を復元</button>
-            <button class="secondary small" data-copy-ja="${item.id}">日本語コピー</button>
-            <button class="secondary small" data-copy-en="${item.id}">Englishコピー</button>
-            <button class="secondary small" data-export="${item.id}">設定JSON出力</button>
-            <button class="danger small" data-delete="${item.id}">削除</button>
+            <button class="secondary small" data-show="${escapeHtml(item.id)}">結果を表示</button>
+            <button class="primary small" data-restore="${escapeHtml(item.id)}">設定を復元</button>
+            <button class="secondary small" data-export-json="${escapeHtml(item.id)}">設定込みJSON出力</button>
+            <button class="danger small" data-delete="${escapeHtml(item.id)}">削除</button>
           </div>
         `;
 
-        div.querySelector("[data-restore]").addEventListener("click", () => {
-          restoreHistoryItem(item);
+        div.querySelector("[data-show]").addEventListener("click", () => {
+          showHistoryResult(item.id);
         });
 
-        div.querySelector("[data-copy-ja]").addEventListener("click", () => {
-          copyText(item.japanesePrompt || "", "履歴の日本語プロンプト");
+        div.querySelector("[data-restore]").addEventListener("click", async () => {
+          await restoreHistorySettings(item.id);
         });
 
-        div.querySelector("[data-copy-en]").addEventListener("click", () => {
-          copyText(item.englishPrompt || "", "履歴のEnglish Prompt");
-        });
-
-        div.querySelector("[data-export]").addEventListener("click", () => {
-          const payload = buildHistoryExportPayload(item);
-          const filename = `${safeFileName(item.selectedCharacterNames?.[0] || "artist-prompt")}-${item.id}.json`;
-          downloadJson(filename, payload);
-          setStatus("履歴の設定JSONを出力しました。", "success");
+        div.querySelector("[data-export-json]").addEventListener("click", () => {
+          exportHistorySettingsJson(item.id);
         });
 
         div.querySelector("[data-delete]").addEventListener("click", () => {
@@ -1797,6 +1886,20 @@ ${buildNoneOptionsBlock()}
       });
     }
 
+    function showHistoryResult(id) {
+      const item = getHistory().find((historyItem) => historyItem.id === id);
+
+      if (!item) {
+        setStatus("履歴が見つかりません。", "error");
+        return;
+      }
+
+      englishPrompt.textContent = item.englishPrompt || "";
+      japanesePrompt.textContent = item.japanesePrompt || "";
+
+      setStatus("履歴の生成結果を表示しました。", "success");
+    }
+
     function deleteHistoryItem(id) {
       const next = getHistory().filter((item) => item.id !== id);
       setHistory(next);
@@ -1805,49 +1908,69 @@ ${buildNoneOptionsBlock()}
     }
 
     function clearHistory() {
-      if (!confirm("生成履歴をすべて削除しますか？")) {
-        return;
-      }
+      const ok = confirm("生成履歴をすべて削除しますか？");
+      if (!ok) return;
 
       setHistory([]);
       renderHistory();
-      setStatus("生成履歴を全削除しました。", "success");
+      setStatus("生成履歴をすべて削除しました。", "success");
     }
 
-    async function restoreHistoryItem(item) {
+    async function restoreHistorySettings(id) {
+      const item = getHistory().find((historyItem) => historyItem.id === id);
+
+      if (!item) {
+        setStatus("履歴が見つかりません。", "error");
+        return;
+      }
+
+      modelName.value = item.modelName || modelName.value;
+
+      sceneText.value = item.sceneText || "";
+      extraText.value = item.extraText || "";
+
+      if (typeof item.personaCategoryId === "string") {
+        personaCategorySelect.value = item.personaCategoryId;
+      }
+
+      personaSearch.value = item.personaSearch || "";
+
       const personaIds = Array.isArray(item.selectedPersonaIds)
         ? item.selectedPersonaIds
         : [];
 
-      const characterIds = Array.isArray(item.selectedCharacterIds)
-        ? item.selectedCharacterIds
-        : [];
-
       selectedPersonas = personaIds
-        .map((id) => personas.find((persona) => persona.id === id))
+        .map((idValue) => personas.find((persona) => persona.id === idValue))
         .filter(Boolean);
 
-      selectedCharacters = characterIds
-        .map((id) => characters.find((character) => character.id === id))
-        .filter(Boolean);
+      if (selectedPersonas.length > MAX_PERSONA_SELECTION) {
+        selectedPersonas = selectedPersonas.slice(0, MAX_PERSONA_SELECTION);
+      }
 
-      modelName.value = item.modelName || "gemini-2.5-flash";
-      sceneText.value = item.sceneText || "";
-      extraText.value = item.extraText || "";
+      collabPattern.value = item.collabPattern || "auto";
 
-      personaCategorySelect.value = item.personaCategoryId || "";
-      personaSearch.value = item.personaSearch || "";
+      if (selectedPersonas.length < 2) {
+        collabPattern.value = "auto";
+        collabPattern.disabled = true;
+      } else {
+        collabPattern.disabled = false;
+      }
 
-      if (item.characterCategoryId && categories.some((category) => category.id === item.characterCategoryId)) {
+      if (typeof item.characterCategoryId === "string") {
         categorySelect.value = item.characterCategoryId;
       }
 
       characterSearch.value = item.characterSearch || "";
 
-      collabPattern.value = item.collabPattern || "auto";
-      collabPattern.disabled = selectedPersonas.length < 2;
+      const characterIds = Array.isArray(item.selectedCharacterIds)
+        ? item.selectedCharacterIds
+        : [];
 
-      setSelectedNoneOptions(item.noneOptions);
+      selectedCharacters = characterIds
+        .map((idValue) => characters.find((character) => character.id === idValue))
+        .filter(Boolean);
+
+      setSelectedNoneOptions(item.noneOptions || []);
 
       englishPrompt.textContent = item.englishPrompt || "";
       japanesePrompt.textContent = item.japanesePrompt || "";
@@ -1879,7 +2002,7 @@ ${buildNoneOptionsBlock()}
 
       if (remaining > 0) {
         setStatus(
-          `Gemini API無料枠対策のため待機中です。残り ${remaining} 秒後に再生成してください。`,
+          `Gemini API無料枠対策のため待機中です。残り ${remaining} 秒後に再生成してください。API送信文は「API送信文をコピー」からコピーできます。`,
           "warning"
         );
         updateGenerateButtonState();
@@ -1894,21 +2017,9 @@ ${buildNoneOptionsBlock()}
         return;
       }
 
-      isGenerating = true;
-      updateGenerateButtonState();
+      const combinedSystemInstruction = buildCombinedSystemInstruction();
 
-      setStatus(
-        "プロンプトを生成中です。Gemini APIへの呼び出しは1回だけ行います...",
-        ""
-      );
-
-      englishPrompt.textContent = "";
-      japanesePrompt.textContent = "";
-
-      try {
-        const combinedSystemInstruction = buildCombinedSystemInstruction();
-
-        const characterPrompt = `
+      const characterPrompt = `
 ユーザーの作りたい画像：
 ${scene}
 
@@ -1918,6 +2029,20 @@ ${extra || "なし"}
 ${buildCharacterPromptBlock()}
 `.trim();
 
+      updateLatestApiRequestText(buildManualPromptRequestText({
+        systemInstruction: combinedSystemInstruction,
+        characterPrompt,
+      }));
+
+      isGenerating = true;
+      updateGenerateButtonState();
+
+      setStatus("プロンプトを生成しています...", "");
+
+      englishPrompt.textContent = "";
+      japanesePrompt.textContent = "";
+
+      try {
         const response = await fetch(FUNCTION_URL, {
           method: "POST",
           headers: {
@@ -1970,18 +2095,18 @@ ${buildCharacterPromptBlock()}
           setCooldown(waitSeconds);
 
           setStatus(
-            `生成エラー：Gemini APIの無料枠または短時間上限に達しています。\n\n${message}\n\n${waitSeconds}秒後に再試行してください。`,
+            `生成エラー：Gemini APIの無料枠または短時間上限に達しています。\n\n${message}\n\n${waitSeconds}秒後に再試行してください。\n\nAPIを使わずに生成したい場合は、「API送信文をコピー」を押して、Gemini等のチャットへ貼り付けてください。`,
             "error"
           );
 
           englishPrompt.textContent =
             `Gemini APIのquota制限に達しました。\n\n` +
             `待機時間：${waitSeconds}秒\n\n` +
-            `対策：\n` +
-            `・この画面で待機する\n` +
-            `・複数タブで生成しない\n` +
-            `・連続クリックしない\n` +
-            `・必要に応じてGoogle AI Studio側の利用状況や課金設定を確認する`;
+            `APIを使用せずに生成する方法：\n` +
+            `1. 左側の「API送信文をコピー」を押す\n` +
+            `2. Gemini等のチャットに貼り付ける\n` +
+            `3. チャット側でプロンプト生成する\n\n` +
+            `このコピー文は、APIに送る直前の System Instruction と User Input をまとめたものです。`;
 
           japanesePrompt.textContent = "";
         } else {
@@ -2006,6 +2131,36 @@ ${buildCharacterPromptBlock()}
       } catch {
         setStatus(`${label}のコピーに失敗しました。`, "error");
       }
+    }
+
+    async function copyLatestApiRequestText() {
+      if (!latestApiRequestText) {
+        const scene = sceneText.value.trim();
+
+        if (!scene) {
+          setStatus("コピーするAPI送信文がありません。先に作りたい画像の内容を入力してください。", "warning");
+          return;
+        }
+
+        const extra = extraText.value.trim();
+        const combinedSystemInstruction = buildCombinedSystemInstruction();
+        const characterPrompt = `
+ユーザーの作りたい画像：
+${scene}
+
+追加条件：
+${extra || "なし"}
+
+${buildCharacterPromptBlock()}
+`.trim();
+
+        updateLatestApiRequestText(buildManualPromptRequestText({
+          systemInstruction: combinedSystemInstruction,
+          characterPrompt,
+        }));
+      }
+
+      await copyText(latestApiRequestText, "API送信文");
     }
 
     function clearInputs() {
@@ -2040,6 +2195,8 @@ ${buildCharacterPromptBlock()}
 
     generateBtn.addEventListener("click", generatePrompt);
 
+    copyRequestBtn.addEventListener("click", copyLatestApiRequestText);
+
     clearInputBtn.addEventListener("click", clearInputs);
 
     copyEnglishBtn.addEventListener("click", () => {
@@ -2057,6 +2214,7 @@ ${buildCharacterPromptBlock()}
 
     clearHistoryBtn.addEventListener("click", clearHistory);
 
+    updateLatestApiRequestText("");
     updateGenerateButtonState();
     startCooldownTimer();
 
