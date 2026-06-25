@@ -322,7 +322,7 @@
     <h1>Artist Prompt Studio Admin</h1>
     <p>
       絵師ペルソナ、キャラクターカテゴリ、キャラクター設定を管理します。
-      Private Storageへの画像アップロードにも対応しています。
+      画像を選択して保存すると、Private Storageへのアップロードとキャラクターレコード保存をまとめて実行します。
     </p>
   </header>
 
@@ -414,7 +414,7 @@
       <div id="charactersPanel" class="hidden">
         <h2>キャラクター管理</h2>
         <p class="hint">
-          キャラクター名、基本プロンプト、Private Storage内の画像パスを管理します。
+          画像ファイルを選択して保存すると、画像アップロードとキャラクターレコード保存をまとめて行います。
         </p>
 
         <div class="form-grid">
@@ -436,9 +436,9 @@
           <textarea id="characterBasePrompt" placeholder="キャラクター設定、外見、性格、役割など"></textarea>
 
           <div class="image-upload-box">
-            <h3>画像アップロード</h3>
+            <h3>画像</h3>
             <p class="hint">
-              PNG / JPEG / WebP に対応しています。アップロード後、Storage内パスが image_url に自動入力されます。
+              PNG / JPEG / WebP に対応しています。画像を選択して保存すると、Storageへアップロード後に image_url へ自動反映されます。
             </p>
 
             <div class="two-col">
@@ -456,11 +456,8 @@
             <div class="upload-preview-wrap">
               <div id="uploadPreviewBox" class="upload-preview empty">Preview</div>
               <div>
-                <div class="actions" style="margin-top:0;">
-                  <button class="secondary" id="uploadImageBtn">画像をアップロード</button>
-                </div>
                 <p class="hint">
-                  先に画像をアップロードしてから、キャラクター保存を押してください。
+                  新しい画像を選択した場合は、保存時にアップロードされます。画像を選択しない場合は、下の image_url の値をそのまま使います。
                 </p>
               </div>
             </div>
@@ -469,11 +466,11 @@
           <label for="characterImageUrl">image_url / Storage内パス</label>
           <input id="characterImageUrl" placeholder="例：NaganoCo/nagano-ai.png" />
           <p class="hint">
-            character_images バケット内のパスです。Private Storageのまま使用できます。
+            既存画像を使う場合は、ここに character_images バケット内のパスを直接入力できます。
           </p>
 
           <div class="actions">
-            <button class="primary" id="saveCharacterBtn">保存</button>
+            <button class="primary" id="saveCharacterBtn">画像アップロードして保存</button>
             <button class="secondary" id="newCharacterBtn">新規入力</button>
           </div>
         </div>
@@ -535,7 +532,6 @@
 
     const uploadFolder = document.getElementById("uploadFolder");
     const characterImageFile = document.getElementById("characterImageFile");
-    const uploadImageBtn = document.getElementById("uploadImageBtn");
     const uploadPreviewBox = document.getElementById("uploadPreviewBox");
 
     const savePersonaBtn = document.getElementById("savePersonaBtn");
@@ -1030,20 +1026,67 @@
       }
     }
 
-    async function saveCharacter() {
-      const payload = {
-        name: characterName.value.trim(),
-        base_prompt: characterBasePrompt.value.trim(),
-        image_url: characterImageUrl.value.trim(),
-        category_id: characterCategory.value || null,
-      };
+    async function uploadSelectedCharacterImageIfNeeded() {
+      if (!selectedUploadFile) {
+        return characterImageUrl.value.trim();
+      }
 
-      if (!payload.name) {
+      const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+
+      if (!allowedTypes.includes(selectedUploadFile.type)) {
+        throw new Error("PNG / JPEG / WebP の画像を選択してください。");
+      }
+
+      const folder = uploadFolder.value.trim() || "default";
+      const base64 = await fileToBase64(selectedUploadFile);
+
+      const result = await adminRequest({
+        action: "upload_image",
+        payload: {
+          fileName: selectedUploadFile.name,
+          contentType: selectedUploadFile.type,
+          base64,
+          folder,
+        },
+      });
+
+      if (!result.path) {
+        throw new Error("画像アップロード後のStorage内パスを取得できませんでした。");
+      }
+
+      characterImageUrl.value = result.path;
+
+      return result.path;
+    }
+
+    async function saveCharacter() {
+      const name = characterName.value.trim();
+      const basePrompt = characterBasePrompt.value.trim();
+      const categoryIdValue = characterCategory.value || null;
+
+      if (!name) {
         setStatus(globalStatus, "キャラクター名を入力してください。", "error");
         return;
       }
 
+      saveCharacterBtn.disabled = true;
+
       try {
+        if (selectedUploadFile) {
+          setStatus(globalStatus, "画像をアップロードしてからキャラクターを保存しています...", "");
+        } else {
+          setStatus(globalStatus, "キャラクターを保存しています...", "");
+        }
+
+        const finalImageUrl = await uploadSelectedCharacterImageIfNeeded();
+
+        const payload = {
+          name,
+          base_prompt: basePrompt,
+          image_url: finalImageUrl,
+          category_id: categoryIdValue,
+        };
+
         const id = characterId.value;
 
         await adminRequest({
@@ -1055,54 +1098,12 @@
 
         await loadAllData();
         clearCharacterForm();
-        setStatus(globalStatus, "キャラクターを保存しました。", "success");
+
+        setStatus(globalStatus, "キャラクターを保存しました。画像を選択していた場合はStorageにもアップロード済みです。", "success");
       } catch (error) {
         setStatus(globalStatus, `保存エラー：${error.message}`, "error");
-      }
-    }
-
-    async function uploadCharacterImage() {
-      if (!selectedUploadFile) {
-        setStatus(globalStatus, "アップロードする画像を選択してください。", "error");
-        return;
-      }
-
-      const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
-
-      if (!allowedTypes.includes(selectedUploadFile.type)) {
-        setStatus(globalStatus, "PNG / JPEG / WebP の画像を選択してください。", "error");
-        return;
-      }
-
-      const folder = uploadFolder.value.trim() || "default";
-
-      uploadImageBtn.disabled = true;
-      setStatus(globalStatus, "画像をアップロードしています...", "");
-
-      try {
-        const base64 = await fileToBase64(selectedUploadFile);
-
-        const result = await adminRequest({
-          action: "upload_image",
-          payload: {
-            fileName: selectedUploadFile.name,
-            contentType: selectedUploadFile.type,
-            base64,
-            folder,
-          },
-        });
-
-        characterImageUrl.value = result.path || "";
-
-        setStatus(
-          globalStatus,
-          `画像をアップロードしました。Storage内パスを image_url に入力しました：${result.path}`,
-          "success"
-        );
-      } catch (error) {
-        setStatus(globalStatus, `画像アップロードエラー：${error.message}`, "error");
       } finally {
-        uploadImageBtn.disabled = false;
+        saveCharacterBtn.disabled = false;
       }
     }
 
@@ -1140,8 +1141,6 @@
     saveCharacterBtn.addEventListener("click", saveCharacter);
     newCharacterBtn.addEventListener("click", clearCharacterForm);
 
-    uploadImageBtn.addEventListener("click", uploadCharacterImage);
-
     characterImageFile.addEventListener("change", async () => {
       const file = characterImageFile.files && characterImageFile.files[0];
 
@@ -1157,6 +1156,7 @@
       try {
         selectedUploadDataUrl = await fileToDataUrl(file);
         renderUploadPreview(selectedUploadDataUrl);
+        setStatus(globalStatus, "画像を選択しました。保存時にアップロードされます。", "success");
       } catch (error) {
         selectedUploadFile = null;
         selectedUploadDataUrl = "";
