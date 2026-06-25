@@ -52,6 +52,24 @@
       line-height: 1.7;
     }
 
+    .top-links {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    .top-links a {
+      color: #020617;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      text-decoration: none;
+      border-radius: 999px;
+      padding: 9px 15px;
+      font-weight: 800;
+      font-size: 14px;
+    }
+
     main {
       width: min(1280px, calc(100% - 32px));
       margin: 24px auto 48px;
@@ -115,6 +133,17 @@
       font-size: 13px;
       line-height: 1.6;
       margin-top: 6px;
+    }
+
+    .login-info {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(31, 41, 55, 0.55);
+      padding: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+      margin-bottom: 14px;
     }
 
     .tabs {
@@ -324,6 +353,10 @@
       絵師ペルソナ、キャラクターカテゴリ、キャラクター設定を管理します。
       画像を選択して保存すると、Private Storageへのアップロードとキャラクターレコード保存をまとめて実行します。
     </p>
+
+    <div class="top-links">
+      <a href="./index.html">プロンプト生成画面へ戻る</a>
+    </div>
   </header>
 
   <section class="card login-box" id="loginSection">
@@ -345,6 +378,10 @@
   <main id="adminMain" class="hidden">
     <aside class="card">
       <h2>管理メニュー</h2>
+
+      <div class="login-info" id="loginInfo">
+        ログイン中です。
+      </div>
 
       <div class="tabs">
         <button class="tab-button active" data-tab="personas">絵師ペルソナ</button>
@@ -470,7 +507,7 @@
           </p>
 
           <div class="actions">
-            <button class="primary" id="saveCharacterBtn">画像アップロードして保存</button>
+            <button class="primary" id="saveCharacterBtn">保存</button>
             <button class="secondary" id="newCharacterBtn">新規入力</button>
           </div>
         </div>
@@ -487,6 +524,8 @@
     const SIGNED_IMAGE_URL_FUNCTION =
       "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-character-image-url";
 
+    const ADMIN_SESSION_KEY = "artist_prompt_admin_password";
+
     let adminPassword = "";
     let currentTab = "personas";
 
@@ -502,6 +541,7 @@
 
     const loginStatus = document.getElementById("loginStatus");
     const globalStatus = document.getElementById("globalStatus");
+    const loginInfo = document.getElementById("loginInfo");
 
     const adminPasswordInput = document.getElementById("adminPassword");
     const loginBtn = document.getElementById("loginBtn");
@@ -560,6 +600,18 @@
     function getShortText(text, max = 120) {
       const value = String(text || "");
       return value.slice(0, max) + (value.length > max ? "..." : "");
+    }
+
+    function saveAdminSession(password) {
+      sessionStorage.setItem(ADMIN_SESSION_KEY, password);
+    }
+
+    function clearAdminSession() {
+      sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    }
+
+    function getAdminSession() {
+      return sessionStorage.getItem(ADMIN_SESSION_KEY) || "";
     }
 
     function fileToBase64(file) {
@@ -675,19 +727,47 @@
       try {
         await loadAllData();
 
+        saveAdminSession(adminPassword);
+
         loginSection.classList.add("hidden");
         adminMain.classList.remove("hidden");
 
+        loginInfo.textContent = "ログイン中です。このタブを閉じるまでは再ログイン不要です。";
         setStatus(globalStatus, "ログインしました。", "success");
       } catch (error) {
         adminPassword = "";
+        clearAdminSession();
         setStatus(loginStatus, `ログイン失敗：${error.message}`, "error");
+      }
+    }
+
+    async function autoLoginFromSession() {
+      const savedPassword = getAdminSession();
+
+      if (!savedPassword) return;
+
+      adminPassword = savedPassword;
+      setStatus(loginStatus, "保存済みセッションでログイン確認中です...", "");
+
+      try {
+        await loadAllData();
+
+        loginSection.classList.add("hidden");
+        adminMain.classList.remove("hidden");
+
+        loginInfo.textContent = "保存済みセッションでログイン中です。";
+        setStatus(globalStatus, "自動ログインしました。", "success");
+      } catch (error) {
+        adminPassword = "";
+        clearAdminSession();
+        setStatus(loginStatus, "保存済みセッションが無効です。再ログインしてください。", "warning");
       }
     }
 
     function logout() {
       adminPassword = "";
       adminPasswordInput.value = "";
+      clearAdminSession();
       loginSection.classList.remove("hidden");
       adminMain.classList.add("hidden");
       setStatus(loginStatus, "ログアウトしました。", "warning");
@@ -1172,6 +1252,8 @@
         uploadFolder.value = categoryName;
       }
     });
+
+    autoLoginFromSession();
   </script>
 </body>
 </html>
