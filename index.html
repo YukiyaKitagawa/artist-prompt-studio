@@ -540,8 +540,9 @@
       <div class="section-block">
         <h3>文字・ロゴ制御</h3>
         <p class="hint">
-          ここで選ぶ制御は、背景の不要な文字や無関係なロゴを抑えるためのものです。
-          キャラクター設定に含まれる服装ロゴ、社名、ヘルメット文字、ワッペン、安全標語などはキャラクター固有のデザインとして優先します。
+          ここで選ぶ制御は、背景や環境に余計な文字・ロゴを出しすぎないための補助です。
+          選択キャラクターに元々含まれる固有のロゴ、服装文字、装備文字、ワッペン、標語などは、
+          キャラクター固有マーキングとして保持する前提です。
         </p>
 
         <div class="option-grid">
@@ -576,10 +577,10 @@
         <h3>シーン指示</h3>
 
         <label for="sceneText">作りたい画像の内容</label>
-        <textarea id="sceneText" placeholder="例：ナガノAIとナガノ玄が、未来的なオフィスでプレゼン資料を作成している。アスペクト比16:9。"></textarea>
+        <textarea id="sceneText" placeholder="例：選択したキャラクターたちが巨大な建設現場のスケールに圧倒されている。アスペクト比16:9。"></textarea>
 
         <label for="extraText">追加条件</label>
-        <textarea id="extraText" placeholder="例：ネオンブルー、ピンク、紫の発光表現。キャラクター固有マーキング以外の背景文字なし。"></textarea>
+        <textarea id="extraText" placeholder="例：ダイナミックな低視点構図、ビビッドな配色、太い主線、キャラクター固有マーキングは保持。"></textarea>
 
         <div class="actions">
           <button class="primary" id="generateBtn">プロンプト生成</button>
@@ -636,21 +637,21 @@
     const IMAGE_SIGN_URL_FUNCTION =
       "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-character-image-url";
 
-    const HISTORY_STORAGE_KEY = "artist_prompt_generation_history_v1";
+    const HISTORY_STORAGE_KEY = "artist_prompt_generation_history_v2";
     const MAX_HISTORY_ITEMS = 20;
     const MAX_PERSONA_SELECTION = 2;
 
     const NONE_OPTION_LABELS = {
       no_text:
-        "Only character-specific design markings may contain readable text; keep the background, environment, props, machines, signs, and scenery free of extra readable text / 文字はキャラクター固有マーキングのみ許可し、背景・環境・小物・機械・看板・風景には余計な読める文字を追加しない",
+        "Readable text is allowed only for selected character-specific design markings; do not add extra readable text to the background or environment / 読める文字は選択キャラクター固有マーキングのみに限定し、背景や環境に余計な読める文字を追加しない",
       no_captions:
-        "No captions, subtitles, speech bubbles, explanatory labels, UI-like text, or annotation text / キャプション、字幕、吹き出し、説明ラベル、UI風文字、注釈文字は入れない",
+        "No captions, subtitles, speech bubbles, explanatory labels, annotation text, or UI-like text / キャプション、字幕、吹き出し、説明ラベル、注釈文字、UI風文字は入れない",
       no_logos:
         "Only selected character-specific logos and markings are allowed; do not add unrelated logos, brand marks, watermarks, or random emblems / 選択キャラクター固有のロゴ・マーキングのみ許可し、無関係なロゴ、ブランドマーク、透かし、ランダムなエンブレムは追加しない",
       no_readable_letters:
-        "Readable text is allowed only when it belongs to the selected character design markings; do not add any other readable text / 読める文字は選択キャラクターのデザインマーキングに属するものだけ許可し、それ以外は追加しない",
+        "Readable text is allowed only when it belongs to the selected character design markings / 読める文字は選択キャラクターのデザインマーキングに属するものだけ許可する",
       no_text_except_title:
-        "Only the specified title text and selected character design markings are allowed; no other readable text / 指定タイトルと選択キャラクターのデザインマーキングのみ許可し、それ以外の読める文字は追加しない",
+        "Only the specified title text and selected character design markings are allowed as readable text / 指定タイトルと選択キャラクターのデザインマーキングのみ読める文字として許可する",
     };
 
     const COLLAB_PATTERN_LABELS = {
@@ -881,9 +882,7 @@
       let basePersonas = personas;
 
       if (currentCategoryId) {
-        basePersonas = basePersonas.filter((persona) => {
-          return persona.category_id === currentCategoryId;
-        });
+        basePersonas = basePersonas.filter((persona) => persona.category_id === currentCategoryId);
       }
 
       if (!keyword) {
@@ -928,18 +927,15 @@
 
     async function renderPersonas() {
       const renderToken = ++personaRenderToken;
-
       personaGrid.innerHTML = "";
 
       const currentCategoryId = personaCategorySelect.value;
-
       const totalCount = personas.filter((persona) => {
         if (!currentCategoryId) return true;
         return persona.category_id === currentCategoryId;
       }).length;
 
       const filteredPersonas = getFilteredPersonas();
-
       updatePersonaSearchInfo(filteredPersonas.length, totalCount);
 
       if (filteredPersonas.length === 0) {
@@ -953,9 +949,7 @@
       const fragment = document.createDocumentFragment();
 
       for (const persona of filteredPersonas) {
-        if (renderToken !== personaRenderToken) {
-          return;
-        }
+        if (renderToken !== personaRenderToken) return;
 
         const button = document.createElement("button");
         button.type = "button";
@@ -969,9 +963,7 @@
         const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
         const signedUrl = await getSignedImageUrl(persona.image_url, "persona");
 
-        if (renderToken !== personaRenderToken) {
-          return;
-        }
+        if (renderToken !== personaRenderToken) return;
 
         button.innerHTML = `
           ${
@@ -993,9 +985,7 @@
         fragment.appendChild(button);
       }
 
-      if (renderToken !== personaRenderToken) {
-        return;
-      }
+      if (renderToken !== personaRenderToken) return;
 
       personaGrid.innerHTML = "";
       personaGrid.appendChild(fragment);
@@ -1011,7 +1001,6 @@
           setStatus("絵師ペルソナは最大2名まで選択できます。", "warning");
           return;
         }
-
         selectedPersonas.push(persona);
       }
 
@@ -1054,18 +1043,15 @@
 
       selectedPersonas.forEach((persona, index) => {
         const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
-
         const chip = document.createElement("span");
         chip.className = "selected-chip";
         chip.innerHTML = `
           <span>${index === 0 ? "A" : "B"}：${escapeHtml(persona.name)} / ${escapeHtml(categoryName)}</span>
           <button type="button" aria-label="解除">×</button>
         `;
-
         chip.querySelector("button").addEventListener("click", () => {
           removePersona(persona.id);
         });
-
         selectedPersonaSummary.appendChild(chip);
       });
     }
@@ -1126,7 +1112,6 @@
       }).length;
 
       const filtered = filteredCount ?? getFilteredCharacters().length;
-
       const keyword = normalizeSearchText(characterSearch.value);
 
       if (keyword) {
@@ -1138,7 +1123,6 @@
 
     async function renderCharacters() {
       const renderToken = ++characterRenderToken;
-
       characterGrid.innerHTML = "";
 
       const currentCategoryId = categorySelect.value;
@@ -1158,9 +1142,7 @@
       const fragment = document.createDocumentFragment();
 
       for (const character of filteredCharacters) {
-        if (renderToken !== characterRenderToken) {
-          return;
-        }
+        if (renderToken !== characterRenderToken) return;
 
         const button = document.createElement("button");
         button.type = "button";
@@ -1173,9 +1155,7 @@
 
         const signedUrl = await getSignedImageUrl(character.image_url, "character");
 
-        if (renderToken !== characterRenderToken) {
-          return;
-        }
+        if (renderToken !== characterRenderToken) return;
 
         button.innerHTML = `
           ${
@@ -1196,9 +1176,7 @@
         fragment.appendChild(button);
       }
 
-      if (renderToken !== characterRenderToken) {
-        return;
-      }
+      if (renderToken !== characterRenderToken) return;
 
       characterGrid.innerHTML = "";
       characterGrid.appendChild(fragment);
@@ -1251,18 +1229,20 @@
           <span>${escapeHtml(character.name)}</span>
           <button type="button" aria-label="解除">×</button>
         `;
-
         chip.querySelector("button").addEventListener("click", () => {
           removeCharacter(character.id);
         });
-
         selectedCharacterSummary.appendChild(chip);
       });
     }
 
     function buildCollabPatternBlock() {
       if (selectedPersonas.length === 0) {
-        return "絵師ペルソナは未選択です。一般的で高品質な画像生成プロンプトとして作成してください。";
+        return `
+絵師ペルソナは未選択です。
+一般的で高品質な画像生成プロンプトとして作成してください。
+ただし、可能な限り一貫した画風、構図、色彩設計、ライティング、質感、雰囲気を持つ完成度の高い表現にしてください。
+`.trim();
       }
 
       if (selectedPersonas.length === 1) {
@@ -1275,7 +1255,11 @@
 - 絵師カテゴリ：${categoryName}
 - 胸像画像パス：${persona.image_url || "未設定"}
 
-この絵師ペルソナの system_instruction を最優先で反映してください。
+画風優先ルール：
+- この絵師ペルソナの system_instruction を画面全体の支配的な画風として強く反映してください。
+- 線画、塗り、色彩設計、ライティング、陰影、構図、遠近感、背景処理、質感、空気感、演出のすべてで、この絵師ペルソナの特徴を明確に押し出してください。
+- キャラクター設定は「何を描くか」を決める情報であり、絵師ペルソナは「どう描くか」を決める最優先情報です。
+- 最終プロンプトでは、画風を末尾に軽く付け足すのではなく、冒頭から一貫して強く反映してください。
 `.trim();
       }
 
@@ -1298,10 +1282,13 @@
 共創パターン：
 ${COLLAB_PATTERN_LABELS[pattern] || COLLAB_PATTERN_LABELS.auto}
 
-解釈ルール：
-- AとBの画風・構図・演出を破綻なく統合してください。
+画風優先ルール：
+- AとBの画風を破綻なく統合してください。
 - 共創パターンに応じて、AとBの担当領域を明確に分担してください。
-- どちらか一方の個性だけに偏らず、両方の特徴が自然に反映されるようにしてください。
+- ただし単なる寄せ集めではなく、画面全体として一体感のある完成された1枚にしてください。
+- 線画、塗り、色彩設計、ライティング、陰影、構図、遠近感、背景処理、質感、空気感、演出において、両者の特徴がはっきり分かるように強く押し出してください。
+- キャラクター設定は「何を描くか」を決める情報であり、絵師ペルソナは「どう描くか」を決める最優先情報です。
+- 最終プロンプトでは、A/Bの画風を単なる補足として末尾に書くのではなく、冒頭から全体の画風ルールとして明確に記述してください。
 `.trim();
     }
 
@@ -1315,24 +1302,22 @@ ${COLLAB_PATTERN_LABELS[pattern] || COLLAB_PATTERN_LABELS.auto}
       const lines = checkedValues.map((value) => `- ${NONE_OPTION_LABELS[value] || value}`);
 
       return `
-文字・ロゴ制御：
+文字・ロゴ制御（内部処理ルール）：
 ${lines.join("\n")}
 
-許可リスト方式の文字ルール：
-- 読める文字を完全禁止とは解釈しないでください。
-- 許可される読める文字は、選択キャラクター設定に含まれるキャラクター固有マーキングのみです。
-- 例：服のロゴ、会社名、ヘルメット文字、ワッペン、安全標語、装備上のラベル、キャラクター識別に必要なマーキング。
-- 背景、看板、壁、機械、空、床、UI、字幕、説明文、透かし、署名、ランダム文字、無関係なロゴには読める文字を追加しないでください。
-- ユーザーが明示的に削除を指示しない限り、キャラクター固有のロゴや文字は削除・置換しないでください。
-- 確認質問は行わず、この許可リストに従ってそのまま画像生成用プロンプトを完成させてください。
+内部処理ルール：
+- これは内部判断用のルールです。最終的な English Prompt / 日本語プロンプト に、この制御文そのものをそのまま出力しないでください。
+- 最終プロンプトには、「no text」「no readable text」「no other text」「without text」「do not add text」「文字なし」「読める文字なし」「〜以外の文字はなし」のような禁止文・否定文を含めないでください。
+- 最終プロンプトでは、必要な場合に限り、表示すべきキャラクター固有マーキングだけを肯定文で自然に記述してください。
+- 選択キャラクターの固有ロゴ、服装文字、装備文字、社名、識別ラベル、ワッペン、標語などはキャラクター固有マーキングとして保持してください。
+- 背景や環境に余計な文字・ロゴを増やしすぎない判断は内部で行い、最終プロンプトでは背景描写を自然に書くことで調整してください。
 
-Allowed-text whitelist rule:
-- Do not interpret this as a total ban on readable text.
-- The only readable text allowed is character-specific design markings from the selected character references.
-- Examples include jacket logos, company names, helmet text, badges, safety slogans, equipment labels, and identity markings that belong to the characters.
-- Do not add readable text to the background, signs, walls, machines, sky, floor, UI panels, captions, subtitles, explanatory labels, watermarks, signatures, random lettering, or unrelated logos.
-- Do not remove or replace character-specific logos or markings unless the user explicitly asks to remove them.
-- Do not ask for clarification. Follow this whitelist rule and complete the image prompt.
+Internal handling rule:
+- This is an internal control rule. Do not echo these control sentences directly in the final English Prompt or Japanese Prompt.
+- Do not include negative restriction phrases in the final prompt such as "no text", "no readable text", "no other text", "without text", "do not add text", or equivalent Japanese prohibitive wording.
+- In the final prompt, only mention visible character-specific markings positively and naturally when needed.
+- Preserve selected character-specific logos, clothing text, equipment labels, company names, badges, slogans, and identifying markings as part of character identity.
+- Control excess background text or unrelated logos internally, without turning the final prompt into a list of prohibitions.
 `.trim();
     }
 
@@ -1357,14 +1342,36 @@ ${character.base_prompt || "未設定"}
 ${character.image_url || "未設定"}
 
 重要：
-このキャラクター設定に含まれるロゴ、服装文字、ヘルメット文字、ワッペン、社名、安全標語、装備上の表記はキャラクター固有のデザイン要素です。
-ユーザーが明示的に削除を指示しない限り、これらは保持してください。
+- このキャラクター設定に含まれるロゴ、服装文字、ヘルメット文字、ワッペン、社名、標語、装備上の表記、識別ラベルなどは、キャラクター固有のデザイン要素です。
+- ユーザーが明示的に削除を指示しない限り、これらは保持してください。
+- 最終プロンプトでは、必要に応じてこれらを自然な肯定文で記述してください。
+- 「〜以外の文字はなし」のような禁止文には変換しないでください。
 `.trim();
       });
 
       return `
 選択キャラクター一覧：
 ${lines.join("\n\n")}
+`.trim();
+    }
+
+    function buildStyleOutputRuleBlock() {
+      return `
+最終出力の画風ルール：
+- 最終的な English Prompt / 日本語プロンプトは、まず画風・描画方針を強く明示するスタイル記述から始めてください。
+- 画風記述では、少なくとも以下を強く反映してください：
+  - linework / 主線
+  - rendering / 塗り・レンダリング
+  - color design / 色彩設計
+  - lighting / ライティング
+  - composition / 構図
+  - perspective / パース・視点
+  - texture or finish / 質感・仕上げ
+  - mood or atmosphere / 雰囲気・空気感
+- 選択された絵師ペルソナがいる場合、その画風を画面全体の支配的なルールとして扱ってください。
+- キャラクター設定は絵柄を弱めるための情報ではありません。キャラクターの同一性を保ちつつ、絵師の画風のほうを強く押し出してください。
+- 最終プロンプトでは、絵師の画風を「最後に一言だけ添える補足」にしないでください。画風は冒頭から主役として記述してください。
+- 絵師が2名いる場合は、共創パターンに応じて、どの要素にどちらの強みが出るかを自然に反映してください。
 `.trim();
     }
 
@@ -1390,17 +1397,21 @@ ${persona.system_instruction || ""}
 - 出力は必ず「## English Prompt」と「## 日本語プロンプト」の2見出しだけにしてください。
 - メモ、解説、補足、Markdown表、コードブロックは出力しないでください。
 - English Prompt は画像生成AIへそのまま入力できる自然な英語にしてください。
-- 日本語プロンプトは、English Promptの内容を確認しやすい日本語にしてください。
-- キャラクター名は、登録されている名称を尊重してください。
-- キャラクターのbase_promptがある場合は、外見・服装・役割・世界観を優先して反映してください。
-- キャラクター設定に含まれるロゴ、社名、ヘルメット文字、服の文字、ワッペン、安全標語、装備上の表記は、キャラクター固有のデザイン要素として優先してください。
-- 文字・ロゴ制御は、読める文字やロゴの完全禁止ではありません。
-- 文字・ロゴ制御が指定されている場合、許可される読める文字・ロゴはキャラクター固有マーキングのみです。
-- それ以外の背景文字、看板文字、字幕、説明文、透かし、署名、ランダム文字、無関係なロゴは追加しないでください。
-- 判断に迷う場合は確認質問をせず、キャラクター固有マーキングだけを許可してください。
-- 絵師ペルソナの胸像画像は、画面上で選択補助として使うための参考情報です。画像そのものを直接読んだ前提で断定しないでください。
-- 絵師ペルソナの画風は system_instruction を最優先で反映してください。
-- 矛盾がある場合は確認質問をせず、キャラクター固有デザインを優先してプロンプトを完成させてください。
+- 日本語プロンプトは、English Promptの内容を確認しやすい自然な日本語にしてください。
+- 選択されたキャラクター名は、そのまま尊重してください。
+- キャラクターの base_prompt がある場合は、外見、服装、役割、世界観、装備、関係性などの内容面を優先して反映してください。
+- 選択キャラクターに含まれるロゴ、社名、服の文字、装備ラベル、識別マーク、ワッペン、標語などは、キャラクター固有マーキングとして扱ってください。
+- 絵師ペルソナが選択されている場合、絵師の system_instruction は画面全体の支配的な画風ルールとして、キャラクター設定より強く反映してください。
+- 言い換えると、キャラクター設定は「何を描くか」を決め、絵師ペルソナは「どう描くか」を決めます。
+- 最終出力では、画風、主線、塗り、色彩、ライティング、構図、質感、雰囲気を強く押し出してください。
+- 画風は補足ではなく主役です。最終プロンプトの冒頭から強く記述してください。
+- 文字・ロゴ制御が指定されている場合でも、それは内部処理ルールであり、最終プロンプトを禁止文の羅列にしないでください。
+- 最終プロンプトには「文字なし」「no text」「no readable text」「〜以外の文字はなし」などの否定文・禁止文を含めないでください。
+- 最終プロンプトでは、必要に応じて表示すべきキャラクター固有マーキングだけを自然な肯定文で記述してください。
+- 絵師ペルソナの胸像画像は、画面上で選択補助として使う参考情報です。画像そのものを直接読んだ前提で断定しないでください。
+- 矛盾がある場合は確認質問をせず、キャラクター固有デザインを保持しつつ、絵師の画風をより強く優先してプロンプトを完成させてください。
+
+${buildStyleOutputRuleBlock()}
 
 ${personaInstructions.join("\n\n")}
 
@@ -1569,7 +1580,7 @@ ${buildNoneOptionsBlock()}
           sortOrder: character.sort_order ?? null,
           basePrompt: character.base_prompt || "",
           characterDesignTextPriority:
-            "Character-specific logos, labels, helmet text, jacket text, badges, safety slogans, and markings should be preserved unless explicitly removed.",
+            "Selected character-specific logos, labels, equipment markings, clothing text, badges, slogans, and identity markings should be preserved unless the user explicitly asks to remove them.",
           missingFromCurrentDatabase: false,
         };
       });
@@ -1577,7 +1588,7 @@ ${buildNoneOptionsBlock()}
       const noneOptions = Array.isArray(item.noneOptions) ? item.noneOptions : [];
 
       return {
-        schema: "artist_prompt_studio_history_settings_v1",
+        schema: "artist_prompt_studio_history_settings_v2",
         exportedAt: new Date().toISOString(),
         sourceApp: {
           name: "Artist Prompt Studio",
@@ -1618,8 +1629,10 @@ ${buildNoneOptionsBlock()}
               label: NONE_OPTION_LABELS[value] || value,
             };
           }),
+          stylePriorityRule:
+            "Artist personas define the dominant rendering style of the entire image. Character settings define subject identity and content details. The artist style should be strongly emphasized from the beginning of the final prompt.",
           characterTextPriorityRule:
-            "Text/logo controls use an allowed-text whitelist. Readable text and logos are allowed only for selected character-specific design markings. Do not add background text, captions, watermarks, random lettering, unrelated logos, signs, or extra readable text.",
+            "Text/logo controls are internal. Final prompts should avoid prohibition phrases and should only mention visible character-specific markings positively when needed.",
         },
         outputs: {
           englishPrompt: item.englishPrompt || "",
@@ -1769,7 +1782,6 @@ ${buildNoneOptionsBlock()}
 
     function clearHistory() {
       const ok = confirm("生成履歴をすべて削除しますか？");
-
       if (!ok) return;
 
       setHistory([]);
