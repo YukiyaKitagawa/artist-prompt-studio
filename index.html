@@ -3,13 +3,17 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Artist Prompt Studio</title>
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     :root {
       --bg: #0f172a;
       --panel: #111827;
       --panel-light: #1f2937;
+      --panel-lighter: #273449;
       --text: #f9fafb;
       --muted: #9ca3af;
       --accent: #38bdf8;
@@ -26,18 +30,18 @@
 
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background:
-        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 32%),
-        radial-gradient(circle at bottom right, rgba(167, 139, 250, 0.18), transparent 32%),
-        var(--bg);
-      color: var(--text);
       min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.2), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(167, 139, 250, 0.2), transparent 32%),
+        var(--bg);
     }
 
     header {
-      padding: 34px 20px 18px;
       text-align: center;
+      padding: 32px 20px 18px;
     }
 
     header h1 {
@@ -47,10 +51,10 @@
     }
 
     header p {
-      margin: 12px auto 0;
+      max-width: 920px;
+      margin: 14px auto 0;
+      line-height: 1.8;
       color: var(--muted);
-      max-width: 900px;
-      line-height: 1.7;
     }
 
     .top-links {
@@ -72,17 +76,18 @@
     }
 
     main {
-      width: min(1280px, calc(100% - 32px));
+      width: min(1440px, calc(100% - 32px));
       margin: 24px auto 48px;
       display: grid;
-      grid-template-columns: 440px 1fr;
+      grid-template-columns: 360px 1fr;
       gap: 20px;
+      align-items: start;
     }
 
     .card {
-      background: rgba(17, 24, 39, 0.88);
+      background: rgba(17, 24, 39, 0.9);
       border: 1px solid var(--border);
-      border-radius: 20px;
+      border-radius: 22px;
       padding: 22px;
       box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
       backdrop-filter: blur(12px);
@@ -93,11 +98,20 @@
       margin-top: 0;
     }
 
+    h2 {
+      font-size: 22px;
+    }
+
+    h3 {
+      font-size: 17px;
+      margin-bottom: 10px;
+    }
+
     label {
       display: block;
-      font-weight: 700;
       margin: 16px 0 8px;
       color: #e5e7eb;
+      font-weight: 800;
     }
 
     input,
@@ -105,12 +119,12 @@
     textarea {
       width: 100%;
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       background: var(--panel-light);
       color: var(--text);
       padding: 11px 13px;
-      font-size: 14px;
       outline: none;
+      font-size: 14px;
     }
 
     textarea {
@@ -126,192 +140,11 @@
       box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
     }
 
-    .hint {
-      color: var(--muted);
-      font-size: 13px;
-      line-height: 1.6;
-      margin-top: 6px;
-    }
-
-    .section-block {
-      margin-top: 22px;
-      padding-top: 18px;
-      border-top: 1px solid var(--border);
-    }
-
-    .grid {
-      display: grid;
-      gap: 10px;
-    }
-
-    .persona-button,
-    .character-button {
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      background: rgba(31, 41, 55, 0.72);
-      color: var(--text);
-      padding: 13px;
-      cursor: pointer;
-      text-align: left;
-      display: flex;
-      gap: 12px;
-      align-items: flex-start;
-      transition: 0.18s ease;
-    }
-
-    .persona-button:hover,
-    .character-button:hover {
-      border-color: var(--accent);
-      transform: translateY(-1px);
-    }
-
-    .persona-button.selected,
-    .character-button.selected {
-      border-color: var(--accent);
-      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(167, 139, 250, 0.18));
-      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
-    }
-
-    .persona-button strong,
-    .character-button strong {
-      display: block;
-      font-size: 15px;
-      margin-bottom: 4px;
-    }
-
-    .persona-button .meta,
-    .character-button .meta {
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
-    }
-
-    .persona-thumb {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      object-fit: cover;
-      background: #020617;
-      border: 1px solid var(--border);
-      flex: 0 0 auto;
-    }
-
-    .persona-placeholder {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      background: #020617;
-      border: 1px solid var(--border);
-      flex: 0 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      font-size: 11px;
-      text-align: center;
-      padding: 6px;
-    }
-
-    .character-thumb {
-      width: 68px;
-      height: 68px;
-      border-radius: 14px;
-      object-fit: cover;
-      background: #020617;
-      border: 1px solid var(--border);
-      flex: 0 0 auto;
-    }
-
-    .character-placeholder {
-      width: 68px;
-      height: 68px;
-      border-radius: 14px;
-      background: #020617;
-      border: 1px solid var(--border);
-      flex: 0 0 auto;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      font-size: 11px;
-    }
-
-    .selected-summary {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .selected-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      border: 1px solid var(--border);
-      background: rgba(31, 41, 55, 0.9);
-      border-radius: 999px;
-      padding: 7px 10px;
-      font-size: 13px;
-      color: #e5e7eb;
-    }
-
-    .selected-chip button {
-      border: none;
-      background: rgba(239, 68, 68, 0.18);
-      color: #fecaca;
-      border-radius: 999px;
-      cursor: pointer;
-      padding: 2px 7px;
-      font-size: 12px;
-      font-weight: 800;
-    }
-
-    .search-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 10px;
-      align-items: end;
-      margin-top: 12px;
-    }
-
-    .option-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 8px;
-    }
-
-    .check-card {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 10px;
-      background: rgba(31, 41, 55, 0.58);
-      display: flex;
-      gap: 8px;
-      align-items: flex-start;
-      color: #e5e7eb;
-      font-size: 13px;
-      line-height: 1.5;
-      cursor: pointer;
-    }
-
-    .check-card input {
-      width: auto;
-      margin-top: 3px;
-    }
-
-    .actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 18px;
-    }
-
     button {
       border: none;
       border-radius: 999px;
-      padding: 10px 16px;
-      font-weight: 800;
+      padding: 11px 17px;
+      font-weight: 900;
       cursor: pointer;
       transition: 0.18s ease;
     }
@@ -323,6 +156,7 @@
     button:disabled {
       opacity: 0.55;
       cursor: not-allowed;
+      transform: none;
     }
 
     .primary {
@@ -345,11 +179,26 @@
       font-size: 13px;
     }
 
-    .status {
-      margin-top: 14px;
-      min-height: 24px;
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+
+    .hint {
+      margin-top: 6px;
       color: var(--muted);
-      line-height: 1.6;
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    .status {
+      min-height: 24px;
+      margin-top: 14px;
+      color: var(--muted);
+      line-height: 1.7;
+      white-space: pre-wrap;
       font-size: 14px;
     }
 
@@ -365,80 +214,166 @@
       color: var(--warning);
     }
 
-    .result-box {
-      border: 1px solid var(--border);
-      background: rgba(15, 23, 42, 0.82);
-      border-radius: 16px;
-      padding: 16px;
-      margin-top: 14px;
+    .section {
+      margin-top: 18px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border);
     }
 
-    .result-box h3 {
-      margin: 0 0 10px;
-      font-size: 17px;
-    }
-
-    .result-content {
-      white-space: pre-wrap;
-      line-height: 1.75;
-      color: #e5e7eb;
-      font-size: 14px;
-      min-height: 120px;
-    }
-
-    .history-list {
+    .two-col {
       display: grid;
-      gap: 10px;
-      margin-top: 14px;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    .three-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 14px;
+    }
+
+    .grid-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .select-card {
+      border: 1px solid var(--border);
+      background: rgba(31, 41, 55, 0.72);
+      border-radius: 18px;
+      padding: 13px;
+      cursor: pointer;
+      transition: 0.18s ease;
+      min-height: 142px;
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .select-card:hover {
+      border-color: rgba(56, 189, 248, 0.7);
+      transform: translateY(-1px);
+    }
+
+    .select-card.selected {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(167, 139, 250, 0.14));
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+    }
+
+    .thumb {
+      width: 72px;
+      height: 72px;
+      border-radius: 15px;
+      object-fit: cover;
+      background: #020617;
+      border: 1px solid var(--border);
+      flex: 0 0 auto;
+    }
+
+    .thumb.persona {
+      border-radius: 50%;
+    }
+
+    .card-body {
+      min-width: 0;
+    }
+
+    .card-title {
+      font-weight: 900;
+      margin-bottom: 5px;
+      word-break: break-word;
+    }
+
+    .card-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .result-box {
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 16px;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      min-height: 240px;
+      font-size: 14px;
     }
 
     .history-item {
       border: 1px solid var(--border);
-      background: rgba(31, 41, 55, 0.72);
       border-radius: 16px;
-      padding: 14px;
+      background: rgba(31, 41, 55, 0.7);
+      padding: 13px;
+      margin-top: 10px;
     }
 
-    .history-item strong {
-      display: block;
-      margin-bottom: 6px;
-      font-size: 15px;
+    .history-title {
+      font-weight: 900;
+      margin-bottom: 5px;
     }
 
     .history-meta {
       color: var(--muted);
       font-size: 12px;
       line-height: 1.55;
-      white-space: pre-wrap;
+      margin-bottom: 10px;
     }
 
-    .history-empty {
-      border: 1px dashed var(--border);
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.12);
+      color: #bae6fd;
+      border: 1px solid rgba(56, 189, 248, 0.24);
+      font-size: 12px;
+      font-weight: 800;
+      margin: 4px 4px 0 0;
+    }
+
+    .warning-box {
+      border: 1px solid rgba(245, 158, 11, 0.5);
+      background: rgba(245, 158, 11, 0.08);
+      color: #fcd34d;
       border-radius: 16px;
-      padding: 14px;
-      color: var(--muted);
+      padding: 13px;
+      line-height: 1.7;
       font-size: 13px;
-      line-height: 1.6;
+      margin-top: 12px;
+    }
+
+    .error-box {
+      border: 1px solid rgba(239, 68, 68, 0.5);
+      background: rgba(239, 68, 68, 0.08);
+      color: #fecaca;
+      border-radius: 16px;
+      padding: 13px;
+      line-height: 1.7;
+      font-size: 13px;
+      margin-top: 12px;
     }
 
     .hidden {
       display: none;
     }
 
-    @media (max-width: 1100px) {
+    @media (max-width: 1080px) {
       main {
         grid-template-columns: 1fr;
       }
-    }
 
-    @media (max-width: 680px) {
-      .option-grid,
-      .search-row {
+      .two-col,
+      .three-col {
         grid-template-columns: 1fr;
-      }
-
-      main {
-        width: min(100% - 20px, 1280px);
       }
     }
   </style>
@@ -448,181 +383,135 @@
   <header>
     <h1>Artist Prompt Studio</h1>
     <p>
-      最大2名の絵師ペルソナとキャラクター設定を組み合わせ、共創パターンを指定して画像生成プロンプトを作成します。
+      絵師ペルソナとキャラクター設定を組み合わせ、画像生成AI向けの完成プロンプトを作成します。
+      生成ボタンにはGemini API無料枠対策として、クールダウンとquotaエラー待機表示を入れています。
     </p>
 
     <div class="top-links">
-      <a href="./admin.html">管理画面を開く</a>
+      <a href="./admin.html">管理画面へ</a>
     </div>
   </header>
 
   <main>
-    <section class="card">
-      <h2>入力</h2>
+    <aside class="card">
+      <h2>生成設定</h2>
 
-      <label for="modelName">使用モデル</label>
-      <select id="modelName">
+      <label for="modelSelect">Geminiモデル</label>
+      <select id="modelSelect">
         <option value="gemini-2.5-flash">gemini-2.5-flash</option>
         <option value="gemini-2.5-pro">gemini-2.5-pro</option>
         <option value="gemini-1.5-flash">gemini-1.5-flash</option>
       </select>
+      <p class="hint">
+        無料枠では短時間の連続生成でquotaエラーになりやすいため、生成後は自動で待機します。
+      </p>
 
-      <div class="section-block">
-        <h3>絵師ペルソナ選択</h3>
-        <p class="hint">
-          最大2名まで選択できます。2名選択時は共創パターンを指定できます。
-        </p>
+      <label for="collabPattern">共創パターン</label>
+      <select id="collabPattern">
+        <option value="auto">おまかせ統合</option>
+        <option value="character_a_background_b">キャラ絵師A + 背景絵師B</option>
+        <option value="background_a_character_b">背景絵師A + キャラ絵師B</option>
+        <option value="left_a_right_b">左側A + 右側B</option>
+        <option value="top_a_bottom_b">上側A + 下側B</option>
+        <option value="foreground_a_background_b">前景A + 背景B</option>
+        <option value="main_a_effect_b">主役A + 演出B</option>
+      </select>
 
-        <label for="personaCategorySelect">絵師カテゴリ</label>
-        <select id="personaCategorySelect"></select>
-        <p class="hint">
-          絵師カテゴリで絞り込みできます。選択済みの絵師はカテゴリを切り替えても保持されます。
-        </p>
+      <label for="textPolicy">文字・ロゴ制御</label>
+      <select id="textPolicy">
+        <option value="character_markings_only">キャラ固有マーキングのみ許可</option>
+        <option value="allow_needed">必要な文字・ロゴは自然に許可</option>
+        <option value="free">制限しない</option>
+      </select>
+      <p class="hint">
+        最終プロンプトには「文字なし」「no text」「〜以外の文字はなし」のような禁止文を出さず、必要な固有マーキングだけを肯定文で扱います。
+      </p>
 
-        <div class="search-row">
-          <div>
-            <label for="personaSearch">絵師検索</label>
-            <input id="personaSearch" placeholder="絵師名・system_instruction・カテゴリ名で検索" />
-          </div>
-          <button class="secondary small" id="clearPersonaSearchBtn">検索クリア</button>
-        </div>
-
-        <p class="hint" id="personaSearchInfo">
-          検索語を入力すると、現在の絵師カテゴリ内で絞り込みます。
-        </p>
-
-        <div id="personaGrid" class="grid" style="margin-top: 14px;"></div>
-
-        <div class="selected-summary" id="selectedPersonaSummary"></div>
-
-        <label for="collabPattern">共創パターン</label>
-        <select id="collabPattern" disabled>
-          <option value="auto">おまかせ統合</option>
-          <option value="character_a_background_b">キャラ絵師A + 背景絵師B</option>
-          <option value="background_a_character_b">背景絵師A + キャラ絵師B</option>
-          <option value="left_a_right_b">左側A + 右側B</option>
-          <option value="top_a_bottom_b">上側A + 下側B</option>
-          <option value="foreground_a_background_b">前景A + 背景B</option>
-          <option value="main_a_effect_b">主役A + 演出B</option>
-        </select>
+      <div class="section">
+        <h3>選択中</h3>
+        <div id="selectedSummary" class="hint">まだ選択されていません。</div>
       </div>
 
-      <div class="section-block">
-        <h3>キャラクター選択</h3>
+      <div class="section">
+        <h3>API待機状態</h3>
+        <div id="cooldownStatus" class="status">生成できます。</div>
+      </div>
 
-        <label for="categorySelect">カテゴリ</label>
-        <select id="categorySelect"></select>
+      <div class="section">
+        <h3>履歴</h3>
+        <div class="actions">
+          <button class="secondary small" id="clearHistoryBtn">履歴削除</button>
+        </div>
+        <div id="historyList"></div>
+      </div>
+    </aside>
+
+    <section class="card">
+      <h2>1. 絵師ペルソナを選択</h2>
+      <p class="hint">
+        最大2名まで選択できます。2名選択時は、A/Bとして共創パターンに従って画風を分担します。
+      </p>
+
+      <div class="two-col">
+        <div>
+          <label for="personaCategoryFilter">絵師カテゴリ</label>
+          <select id="personaCategoryFilter">
+            <option value="">すべて</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="personaSearch">絵師検索</label>
+          <input id="personaSearch" placeholder="絵師名・画風で検索" />
+        </div>
+      </div>
+
+      <div id="personaList" class="grid-list"></div>
+
+      <div class="section">
+        <h2>2. キャラクターを選択</h2>
         <p class="hint">
-          カテゴリを切り替えても、選択済みキャラクターは保持されます。
+          画像化したいキャラクターを選択してください。複数選択できます。
         </p>
 
-        <div class="search-row">
+        <div class="two-col">
+          <div>
+            <label for="characterCategoryFilter">キャラクターカテゴリ</label>
+            <select id="characterCategoryFilter">
+              <option value="">すべて</option>
+            </select>
+          </div>
+
           <div>
             <label for="characterSearch">キャラクター検索</label>
-            <input id="characterSearch" placeholder="名前・base_prompt・カテゴリ名で検索" />
+            <input id="characterSearch" placeholder="キャラクター名・設定で検索" />
           </div>
-          <button class="secondary small" id="clearCharacterSearchBtn">検索クリア</button>
         </div>
 
-        <p class="hint" id="characterSearchInfo">
-          検索語を入力すると、現在のカテゴリ内で絞り込みます。
-        </p>
-
-        <div class="actions">
-          <button class="secondary small" id="clearCharactersBtn">選択中キャラクターを全解除</button>
-        </div>
-
-        <div class="selected-summary" id="selectedCharacterSummary"></div>
-
-        <div id="characterGrid" class="grid" style="margin-top: 14px;"></div>
+        <div id="characterList" class="grid-list"></div>
       </div>
 
-      <div class="section-block">
-        <h3>文字・ロゴ制御</h3>
-        <p class="hint">
-          ここで選ぶ制御は、背景や環境に余計な文字・ロゴを出しすぎないための補助です。
-          選択キャラクターに元々含まれる固有のロゴ、服装文字、装備文字、ワッペン、標語などは、
-          キャラクター固有マーキングとして保持する前提です。
-        </p>
+      <div class="section">
+        <h2>3. シーン指示</h2>
 
-        <div class="option-grid">
-          <label class="check-card">
-            <input type="checkbox" class="none-option" value="no_text" />
-            <span>文字はキャラ固有マーキングのみ許可</span>
-          </label>
+        <label for="sceneInput">シーン・状況</label>
+        <textarea id="sceneInput" placeholder="例：選択したキャラクターたちが巨大な建設現場のスケールに圧倒されている。アスペクト比16:9。"></textarea>
 
-          <label class="check-card">
-            <input type="checkbox" class="none-option" value="no_captions" />
-            <span>キャプション・字幕・吹き出しなし</span>
-          </label>
-
-          <label class="check-card">
-            <input type="checkbox" class="none-option" value="no_logos" />
-            <span>キャラ固有ロゴ以外を追加しない</span>
-          </label>
-
-          <label class="check-card">
-            <input type="checkbox" class="none-option" value="no_readable_letters" />
-            <span>読める文字はキャラ設定マーキングのみ許可</span>
-          </label>
-
-          <label class="check-card">
-            <input type="checkbox" class="none-option" value="no_text_except_title" />
-            <span>タイトルとキャラ設定マーキングのみ許可</span>
-          </label>
-        </div>
-      </div>
-
-      <div class="section-block">
-        <h3>シーン指示</h3>
-
-        <label for="sceneText">作りたい画像の内容</label>
-        <textarea id="sceneText" placeholder="例：選択したキャラクターたちが巨大な建設現場のスケールに圧倒されている。アスペクト比16:9。"></textarea>
-
-        <label for="extraText">追加条件</label>
-        <textarea id="extraText" placeholder="例：ダイナミックな低視点構図、ビビッドな配色、太い主線、キャラクター固有マーキングは保持。"></textarea>
+        <label for="additionalInput">追加指示</label>
+        <textarea id="additionalInput" placeholder="例：ダイナミックな低視点構図、ビビッドな配色、太い主線、キャラクター固有マーキングは保持。"></textarea>
 
         <div class="actions">
           <button class="primary" id="generateBtn">プロンプト生成</button>
-          <button class="secondary" id="clearInputBtn">入力をクリア</button>
+          <button class="secondary" id="copyResultBtn">結果をコピー</button>
+          <button class="secondary" id="exportSettingsBtn">設定JSON出力</button>
         </div>
 
-        <div class="status" id="status"></div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>生成結果</h2>
-
-      <div class="result-box">
-        <h3>English Prompt</h3>
-        <div class="result-content" id="englishPrompt"></div>
-        <div class="actions">
-          <button class="secondary small" id="copyEnglishBtn">English Promptをコピー</button>
-        </div>
+        <div id="generateStatus" class="status"></div>
       </div>
 
-      <div class="result-box">
-        <h3>日本語プロンプト</h3>
-        <div class="result-content" id="japanesePrompt"></div>
-        <div class="actions">
-          <button class="secondary small" id="copyJapaneseBtn">日本語プロンプトをコピー</button>
-        </div>
-      </div>
-
-      <div class="section-block">
-        <h3>生成履歴</h3>
-        <p class="hint">
-          生成履歴はこのブラウザのlocalStorageに最大20件保存されます。
-          履歴ごとに、選択した絵師・キャラクター・カテゴリ・検索語・文字制御・共創パターン・入力文を含む設定込みJSONを出力できます。
-        </p>
-
-        <div class="actions">
-          <button class="secondary small" id="reloadHistoryBtn">履歴を再読み込み</button>
-          <button class="danger small" id="clearHistoryBtn">履歴を全削除</button>
-        </div>
-
-        <div id="historyList" class="history-list"></div>
+      <div class="section">
+        <h2>生成結果</h2>
+        <div id="resultBox" class="result-box">ここに生成結果が表示されます。</div>
       </div>
     </section>
   </main>
@@ -637,84 +526,57 @@
     const IMAGE_SIGN_URL_FUNCTION =
       "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-character-image-url";
 
-    const HISTORY_STORAGE_KEY = "artist_prompt_generation_history_v2";
-    const MAX_HISTORY_ITEMS = 20;
     const MAX_PERSONA_SELECTION = 2;
+    const HISTORY_KEY = "artist_prompt_generation_history_v2";
+    const COOLDOWN_KEY = "artist_prompt_generation_cooldown_until_v1";
+    const DEFAULT_COOLDOWN_SECONDS = 60;
 
-    const NONE_OPTION_LABELS = {
-      no_text:
-        "Readable text is allowed only for selected character-specific design markings; do not add extra readable text to the background or environment / 読める文字は選択キャラクター固有マーキングのみに限定し、背景や環境に余計な読める文字を追加しない",
-      no_captions:
-        "No captions, subtitles, speech bubbles, explanatory labels, annotation text, or UI-like text / キャプション、字幕、吹き出し、説明ラベル、注釈文字、UI風文字は入れない",
-      no_logos:
-        "Only selected character-specific logos and markings are allowed; do not add unrelated logos, brand marks, watermarks, or random emblems / 選択キャラクター固有のロゴ・マーキングのみ許可し、無関係なロゴ、ブランドマーク、透かし、ランダムなエンブレムは追加しない",
-      no_readable_letters:
-        "Readable text is allowed only when it belongs to the selected character design markings / 読める文字は選択キャラクターのデザインマーキングに属するものだけ許可する",
-      no_text_except_title:
-        "Only the specified title text and selected character design markings are allowed as readable text / 指定タイトルと選択キャラクターのデザインマーキングのみ読める文字として許可する",
-    };
-
-    const COLLAB_PATTERN_LABELS = {
-      auto: "おまかせ統合",
-      character_a_background_b: "キャラ絵師A + 背景絵師B",
-      background_a_character_b: "背景絵師A + キャラ絵師B",
-      left_a_right_b: "左側A + 右側B",
-      top_a_bottom_b: "上側A + 下側B",
-      foreground_a_background_b: "前景A + 背景B",
-      main_a_effect_b: "主役A + 演出B",
-    };
-
-    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const supabaseClient = window.supabase.createClient(
+      SUPABASE_URL,
+      SUPABASE_ANON_KEY
+    );
 
     let personas = [];
     let personaCategories = [];
-    let categories = [];
+    let characterCategories = [];
     let characters = [];
 
-    let selectedPersonas = [];
-    let selectedCharacters = [];
+    let selectedPersonaIds = [];
+    let selectedCharacterIds = [];
 
-    let personaRenderToken = 0;
-    let characterRenderToken = 0;
+    let isGenerating = false;
+    let cooldownUntil = Number(localStorage.getItem(COOLDOWN_KEY) || 0);
+    let cooldownTimer = null;
 
-    const modelName = document.getElementById("modelName");
-
-    const personaCategorySelect = document.getElementById("personaCategorySelect");
-    const personaSearch = document.getElementById("personaSearch");
-    const clearPersonaSearchBtn = document.getElementById("clearPersonaSearchBtn");
-    const personaSearchInfo = document.getElementById("personaSearchInfo");
-    const personaGrid = document.getElementById("personaGrid");
-    const selectedPersonaSummary = document.getElementById("selectedPersonaSummary");
+    const modelSelect = document.getElementById("modelSelect");
     const collabPattern = document.getElementById("collabPattern");
+    const textPolicy = document.getElementById("textPolicy");
 
-    const categorySelect = document.getElementById("categorySelect");
+    const personaCategoryFilter = document.getElementById("personaCategoryFilter");
+    const personaSearch = document.getElementById("personaSearch");
+    const personaList = document.getElementById("personaList");
+
+    const characterCategoryFilter = document.getElementById("characterCategoryFilter");
     const characterSearch = document.getElementById("characterSearch");
-    const clearCharacterSearchBtn = document.getElementById("clearCharacterSearchBtn");
-    const characterSearchInfo = document.getElementById("characterSearchInfo");
-    const characterGrid = document.getElementById("characterGrid");
-    const selectedCharacterSummary = document.getElementById("selectedCharacterSummary");
-    const clearCharactersBtn = document.getElementById("clearCharactersBtn");
+    const characterList = document.getElementById("characterList");
 
-    const sceneText = document.getElementById("sceneText");
-    const extraText = document.getElementById("extraText");
+    const sceneInput = document.getElementById("sceneInput");
+    const additionalInput = document.getElementById("additionalInput");
 
     const generateBtn = document.getElementById("generateBtn");
-    const clearInputBtn = document.getElementById("clearInputBtn");
-
-    const statusEl = document.getElementById("status");
-    const englishPrompt = document.getElementById("englishPrompt");
-    const japanesePrompt = document.getElementById("japanesePrompt");
-
-    const copyEnglishBtn = document.getElementById("copyEnglishBtn");
-    const copyJapaneseBtn = document.getElementById("copyJapaneseBtn");
-
-    const historyList = document.getElementById("historyList");
-    const reloadHistoryBtn = document.getElementById("reloadHistoryBtn");
+    const copyResultBtn = document.getElementById("copyResultBtn");
+    const exportSettingsBtn = document.getElementById("exportSettingsBtn");
     const clearHistoryBtn = document.getElementById("clearHistoryBtn");
 
-    function setStatus(message, type = "") {
-      statusEl.textContent = message;
-      statusEl.className = `status ${type}`;
+    const generateStatus = document.getElementById("generateStatus");
+    const cooldownStatus = document.getElementById("cooldownStatus");
+    const selectedSummary = document.getElementById("selectedSummary");
+    const resultBox = document.getElementById("resultBox");
+    const historyList = document.getElementById("historyList");
+
+    function setStatus(el, message, type = "") {
+      el.textContent = message;
+      el.className = `status ${type}`;
     }
 
     function escapeHtml(text) {
@@ -726,55 +588,121 @@
         .replaceAll("'", "&#039;");
     }
 
-    function getShortText(text, max = 110) {
+    function shortText(text, max = 130) {
       const value = String(text || "");
       return value.slice(0, max) + (value.length > max ? "..." : "");
     }
 
-    function normalizeSearchText(text) {
-      return String(text || "")
-        .toLowerCase()
-        .replace(/\s+/g, " ")
-        .trim();
+    function nowMs() {
+      return Date.now();
     }
 
-    function getPersonaCategoryNameById(categoryId) {
-      const category = personaCategories.find((item) => item.id === categoryId);
-      return category ? category.name : "";
+    function getRemainingCooldownSeconds() {
+      const remainingMs = cooldownUntil - nowMs();
+      return Math.max(0, Math.ceil(remainingMs / 1000));
     }
 
-    function getCategoryNameById(categoryId) {
-      const category = categories.find((item) => item.id === categoryId);
-      return category ? category.name : "";
+    function setCooldown(seconds) {
+      const safeSeconds = Math.max(0, Math.ceil(Number(seconds) || 0));
+
+      if (safeSeconds <= 0) {
+        cooldownUntil = 0;
+        localStorage.removeItem(COOLDOWN_KEY);
+      } else {
+        cooldownUntil = nowMs() + safeSeconds * 1000;
+        localStorage.setItem(COOLDOWN_KEY, String(cooldownUntil));
+      }
+
+      updateCooldownUi();
+      startCooldownTimer();
     }
 
-    function getPersonaCategoryById(categoryId) {
-      return personaCategories.find((item) => item.id === categoryId) || null;
+    function clearCooldown() {
+      cooldownUntil = 0;
+      localStorage.removeItem(COOLDOWN_KEY);
+      updateCooldownUi();
     }
 
-    function getCharacterCategoryById(categoryId) {
-      return categories.find((item) => item.id === categoryId) || null;
+    function startCooldownTimer() {
+      if (cooldownTimer) {
+        clearInterval(cooldownTimer);
+      }
+
+      cooldownTimer = setInterval(() => {
+        updateCooldownUi();
+
+        if (getRemainingCooldownSeconds() <= 0 && !isGenerating) {
+          clearInterval(cooldownTimer);
+          cooldownTimer = null;
+          clearCooldown();
+        }
+      }, 1000);
     }
 
-    function getSelectedNoneOptions() {
-      return Array.from(document.querySelectorAll(".none-option:checked"))
-        .map((input) => input.value)
-        .filter(Boolean);
+    function updateCooldownUi() {
+      const remaining = getRemainingCooldownSeconds();
+
+      if (isGenerating) {
+        generateBtn.disabled = true;
+        generateBtn.textContent = "生成中...";
+        setStatus(cooldownStatus, "Gemini APIへリクエスト中です。連打防止のためボタンを無効化しています。", "");
+        return;
+      }
+
+      if (remaining > 0) {
+        generateBtn.disabled = true;
+        generateBtn.textContent = `待機中 ${remaining}秒`;
+        setStatus(
+          cooldownStatus,
+          `Gemini API無料枠対策のため待機中です。残り ${remaining} 秒後に再生成できます。`,
+          "warning"
+        );
+        return;
+      }
+
+      generateBtn.disabled = false;
+      generateBtn.textContent = "プロンプト生成";
+      setStatus(cooldownStatus, "生成できます。", "success");
     }
 
-    function setSelectedNoneOptions(values) {
-      const selectedValues = Array.isArray(values) ? values : [];
+    function extractRetrySecondsFromError(message) {
+      const text = String(message || "");
 
-      document.querySelectorAll(".none-option").forEach((input) => {
-        input.checked = selectedValues.includes(input.value);
-      });
+      const retryInMatch = text.match(/retry in\s+([0-9.]+)s/i);
+      if (retryInMatch) {
+        return Math.ceil(Number(retryInMatch[1]));
+      }
+
+      const retryAfterMatch = text.match(/retry after\s+([0-9.]+)s/i);
+      if (retryAfterMatch) {
+        return Math.ceil(Number(retryAfterMatch[1]));
+      }
+
+      const japaneseSecondsMatch = text.match(/([0-9.]+)\s*秒/);
+      if (japaneseSecondsMatch && text.includes("retry")) {
+        return Math.ceil(Number(japaneseSecondsMatch[1]));
+      }
+
+      return 60;
     }
 
-    async function getSignedImageUrl(imagePath, imageType = "character") {
-      if (!imagePath) return "";
+    function isQuotaError(message) {
+      const text = String(message || "").toLowerCase();
 
-      if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
-        return imagePath;
+      return (
+        text.includes("quota") ||
+        text.includes("rate-limit") ||
+        text.includes("rate limit") ||
+        text.includes("too many requests") ||
+        text.includes("exceeded")
+      );
+    }
+
+    async function getSignedImageUrl(path, imageType) {
+      if (!path) return "";
+
+      if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path;
       }
 
       try {
@@ -785,7 +713,7 @@
           },
           body: JSON.stringify({
             imageType,
-            path: imagePath,
+            path,
           }),
         });
 
@@ -802,1202 +730,764 @@
     }
 
     async function loadInitialData() {
-      setStatus("データを読み込み中です...", "");
+      setStatus(generateStatus, "データを読み込み中です...", "");
 
-      try {
-        const [personaResult, personaCategoryResult, categoryResult, characterResult] = await Promise.all([
-          supabaseClient
-            .from("artist_prompt_personas")
-            .select("*")
-            .eq("is_active", true)
-            .order("sort_order", { ascending: true })
-            .order("name", { ascending: true }),
+      const [
+        personaResult,
+        personaCategoryResult,
+        characterCategoryResult,
+        characterResult,
+      ] = await Promise.all([
+        supabaseClient
+          .from("artist_prompt_personas")
+          .select("*")
+          .eq("is_active", true)
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
 
-          supabaseClient
-            .from("artist_persona_categories")
-            .select("*")
-            .order("sort_order", { ascending: true })
-            .order("name", { ascending: true }),
+        supabaseClient
+          .from("artist_persona_categories")
+          .select("*")
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
 
-          supabaseClient
-            .from("character_categories")
-            .select("*")
-            .order("sort_order", { ascending: true })
-            .order("name", { ascending: true }),
+        supabaseClient
+          .from("character_categories")
+          .select("*")
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
 
-          supabaseClient
-            .from("character_profiles")
-            .select("*")
-            .order("sort_order", { ascending: true })
-            .order("name", { ascending: true }),
-        ]);
+        supabaseClient
+          .from("character_profiles")
+          .select("*")
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
+      ]);
 
-        if (personaResult.error) throw personaResult.error;
-        if (personaCategoryResult.error) throw personaCategoryResult.error;
-        if (categoryResult.error) throw categoryResult.error;
-        if (characterResult.error) throw characterResult.error;
+      if (personaResult.error) throw new Error(personaResult.error.message);
+      if (personaCategoryResult.error) throw new Error(personaCategoryResult.error.message);
+      if (characterCategoryResult.error) throw new Error(characterCategoryResult.error.message);
+      if (characterResult.error) throw new Error(characterResult.error.message);
 
-        personas = personaResult.data || [];
-        personaCategories = personaCategoryResult.data || [];
-        categories = categoryResult.data || [];
-        characters = characterResult.data || [];
+      personas = personaResult.data || [];
+      personaCategories = personaCategoryResult.data || [];
+      characterCategories = characterCategoryResult.data || [];
+      characters = characterResult.data || [];
 
-        renderPersonaCategories();
-        renderCharacterCategories();
+      renderFilters();
+      await renderPersonaCards();
+      await renderCharacterCards();
+      renderSelectedSummary();
+      renderHistory();
 
-        await renderPersonas();
-        await renderCharacters();
-
-        renderSelectedPersonaSummary();
-        renderSelectedCharacterSummary();
-        renderHistory();
-
-        setStatus("データを読み込みました。", "success");
-      } catch (error) {
-        setStatus(`データ読み込みエラー：${error.message}`, "error");
-      }
+      setStatus(generateStatus, "データを読み込みました。", "success");
     }
 
-    function renderPersonaCategories() {
-      personaCategorySelect.innerHTML = "";
-
-      const allOption = document.createElement("option");
-      allOption.value = "";
-      allOption.textContent = `すべての絵師カテゴリ（${personas.length}件）`;
-      personaCategorySelect.appendChild(allOption);
+    function renderFilters() {
+      personaCategoryFilter.innerHTML = `<option value="">すべて</option>`;
 
       personaCategories.forEach((category) => {
-        const count = personas.filter((persona) => persona.category_id === category.id).length;
         const option = document.createElement("option");
         option.value = category.id;
-        option.textContent = `${category.name}（${count}件）`;
-        personaCategorySelect.appendChild(option);
+        option.textContent = category.name;
+        personaCategoryFilter.appendChild(option);
       });
+
+      characterCategoryFilter.innerHTML = `<option value="">すべて</option>`;
+
+      characterCategories.forEach((category) => {
+        const option = document.createElement("option");
+        option.value = category.id;
+        option.textContent = category.name;
+        characterCategoryFilter.appendChild(option);
+      });
+    }
+
+    function getPersonaCategoryName(id) {
+      const category = personaCategories.find((item) => item.id === id);
+      return category ? category.name : "未設定";
+    }
+
+    function getCharacterCategoryName(id) {
+      const category = characterCategories.find((item) => item.id === id);
+      return category ? category.name : "未設定";
     }
 
     function getFilteredPersonas() {
-      const currentCategoryId = personaCategorySelect.value;
-      const keyword = normalizeSearchText(personaSearch.value);
+      const categoryId = personaCategoryFilter.value;
+      const keyword = personaSearch.value.trim().toLowerCase();
 
-      let basePersonas = personas;
+      return personas.filter((persona) => {
+        if (categoryId && persona.category_id !== categoryId) {
+          return false;
+        }
 
-      if (currentCategoryId) {
-        basePersonas = basePersonas.filter((persona) => persona.category_id === currentCategoryId);
-      }
+        if (!keyword) {
+          return true;
+        }
 
-      if (!keyword) {
-        return basePersonas;
-      }
-
-      return basePersonas.filter((persona) => {
-        const categoryName = getPersonaCategoryNameById(persona.category_id);
-
-        const searchSource = normalizeSearchText([
+        const target = [
           persona.name,
           persona.system_instruction,
-          persona.image_url,
-          categoryName,
-        ].join(" "));
+          getPersonaCategoryName(persona.category_id),
+        ]
+          .join(" ")
+          .toLowerCase();
 
-        return searchSource.includes(keyword);
+        return target.includes(keyword);
       });
-    }
-
-    function updatePersonaSearchInfo(filteredCount = null, totalCount = null) {
-      const currentCategoryId = personaCategorySelect.value;
-
-      const total = totalCount ?? personas.filter((persona) => {
-        if (!currentCategoryId) return true;
-        return persona.category_id === currentCategoryId;
-      }).length;
-
-      const filtered = filteredCount ?? getFilteredPersonas().length;
-
-      const keyword = normalizeSearchText(personaSearch.value);
-      const categoryName = currentCategoryId
-        ? getPersonaCategoryNameById(currentCategoryId)
-        : "すべての絵師カテゴリ";
-
-      if (keyword) {
-        personaSearchInfo.textContent = `検索中：${filtered}件 / ${categoryName} 全体：${total}件`;
-      } else {
-        personaSearchInfo.textContent = `${categoryName} 全体：${total}件`;
-      }
-    }
-
-    async function renderPersonas() {
-      const renderToken = ++personaRenderToken;
-      personaGrid.innerHTML = "";
-
-      const currentCategoryId = personaCategorySelect.value;
-      const totalCount = personas.filter((persona) => {
-        if (!currentCategoryId) return true;
-        return persona.category_id === currentCategoryId;
-      }).length;
-
-      const filteredPersonas = getFilteredPersonas();
-      updatePersonaSearchInfo(filteredPersonas.length, totalCount);
-
-      if (filteredPersonas.length === 0) {
-        const keyword = normalizeSearchText(personaSearch.value);
-        personaGrid.innerHTML = keyword
-          ? `<div class="hint">検索条件に一致する絵師ペルソナがありません。</div>`
-          : `<div class="hint">この絵師カテゴリには有効な絵師ペルソナがありません。</div>`;
-        return;
-      }
-
-      const fragment = document.createDocumentFragment();
-
-      for (const persona of filteredPersonas) {
-        if (renderToken !== personaRenderToken) return;
-
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "persona-button";
-        button.dataset.id = persona.id;
-
-        if (selectedPersonas.some((item) => item.id === persona.id)) {
-          button.classList.add("selected");
-        }
-
-        const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
-        const signedUrl = await getSignedImageUrl(persona.image_url, "persona");
-
-        if (renderToken !== personaRenderToken) return;
-
-        button.innerHTML = `
-          ${
-            signedUrl
-              ? `<img class="persona-thumb" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(persona.name)}">`
-              : `<div class="persona-placeholder">No Image</div>`
-          }
-          <div>
-            <strong>${escapeHtml(persona.name)}</strong>
-            <div class="meta">カテゴリ：${escapeHtml(categoryName)}</div>
-            <div class="meta">${escapeHtml(getShortText(persona.system_instruction, 150))}</div>
-          </div>
-        `;
-
-        button.addEventListener("click", () => {
-          togglePersona(persona);
-        });
-
-        fragment.appendChild(button);
-      }
-
-      if (renderToken !== personaRenderToken) return;
-
-      personaGrid.innerHTML = "";
-      personaGrid.appendChild(fragment);
-    }
-
-    function togglePersona(persona) {
-      const exists = selectedPersonas.some((item) => item.id === persona.id);
-
-      if (exists) {
-        selectedPersonas = selectedPersonas.filter((item) => item.id !== persona.id);
-      } else {
-        if (selectedPersonas.length >= MAX_PERSONA_SELECTION) {
-          setStatus("絵師ペルソナは最大2名まで選択できます。", "warning");
-          return;
-        }
-        selectedPersonas.push(persona);
-      }
-
-      if (selectedPersonas.length < 2) {
-        collabPattern.value = "auto";
-        collabPattern.disabled = true;
-      } else {
-        collabPattern.disabled = false;
-      }
-
-      renderPersonas();
-      renderSelectedPersonaSummary();
-    }
-
-    function removePersona(id) {
-      selectedPersonas = selectedPersonas.filter((persona) => persona.id !== id);
-
-      if (selectedPersonas.length < 2) {
-        collabPattern.value = "auto";
-        collabPattern.disabled = true;
-      }
-
-      renderPersonas();
-      renderSelectedPersonaSummary();
-    }
-
-    function clearPersonaSearch() {
-      personaSearch.value = "";
-      renderPersonas();
-      setStatus("絵師検索をクリアしました。", "success");
-    }
-
-    function renderSelectedPersonaSummary() {
-      selectedPersonaSummary.innerHTML = "";
-
-      if (selectedPersonas.length === 0) {
-        selectedPersonaSummary.innerHTML = `<span class="hint">絵師ペルソナ未選択</span>`;
-        return;
-      }
-
-      selectedPersonas.forEach((persona, index) => {
-        const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
-        const chip = document.createElement("span");
-        chip.className = "selected-chip";
-        chip.innerHTML = `
-          <span>${index === 0 ? "A" : "B"}：${escapeHtml(persona.name)} / ${escapeHtml(categoryName)}</span>
-          <button type="button" aria-label="解除">×</button>
-        `;
-        chip.querySelector("button").addEventListener("click", () => {
-          removePersona(persona.id);
-        });
-        selectedPersonaSummary.appendChild(chip);
-      });
-    }
-
-    function renderCharacterCategories() {
-      categorySelect.innerHTML = "";
-
-      if (categories.length === 0) {
-        const option = document.createElement("option");
-        option.value = "";
-        option.textContent = "カテゴリなし";
-        categorySelect.appendChild(option);
-        updateCharacterSearchInfo(0, 0);
-        return;
-      }
-
-      categories.forEach((category) => {
-        const count = characters.filter((character) => character.category_id === category.id).length;
-        const option = document.createElement("option");
-        option.value = category.id;
-        option.textContent = `${category.name}（${count}件）`;
-        categorySelect.appendChild(option);
-      });
-
-      updateCharacterSearchInfo();
     }
 
     function getFilteredCharacters() {
-      const currentCategoryId = categorySelect.value;
-      const keyword = normalizeSearchText(characterSearch.value);
-      const categoryName = getCategoryNameById(currentCategoryId);
+      const categoryId = characterCategoryFilter.value;
+      const keyword = characterSearch.value.trim().toLowerCase();
 
-      const categoryCharacters = characters.filter((character) => {
-        return character.category_id === currentCategoryId;
-      });
+      return characters.filter((character) => {
+        if (categoryId && character.category_id !== categoryId) {
+          return false;
+        }
 
-      if (!keyword) {
-        return categoryCharacters;
-      }
+        if (!keyword) {
+          return true;
+        }
 
-      return categoryCharacters.filter((character) => {
-        const searchSource = normalizeSearchText([
+        const target = [
           character.name,
           character.base_prompt,
-          character.image_url,
-          categoryName,
-        ].join(" "));
+          getCharacterCategoryName(character.category_id),
+        ]
+          .join(" ")
+          .toLowerCase();
 
-        return searchSource.includes(keyword);
+        return target.includes(keyword);
       });
     }
 
-    function updateCharacterSearchInfo(filteredCount = null, totalCount = null) {
-      const currentCategoryId = categorySelect.value;
+    async function renderPersonaCards() {
+      const list = getFilteredPersonas();
+      personaList.innerHTML = "";
 
-      const total = totalCount ?? characters.filter((character) => {
-        return character.category_id === currentCategoryId;
-      }).length;
-
-      const filtered = filteredCount ?? getFilteredCharacters().length;
-      const keyword = normalizeSearchText(characterSearch.value);
-
-      if (keyword) {
-        characterSearchInfo.textContent = `検索中：${filtered}件 / このカテゴリ全体：${total}件`;
-      } else {
-        characterSearchInfo.textContent = `このカテゴリ全体：${total}件`;
-      }
-    }
-
-    async function renderCharacters() {
-      const renderToken = ++characterRenderToken;
-      characterGrid.innerHTML = "";
-
-      const currentCategoryId = categorySelect.value;
-      const totalCount = characters.filter((character) => character.category_id === currentCategoryId).length;
-      const filteredCharacters = getFilteredCharacters();
-
-      updateCharacterSearchInfo(filteredCharacters.length, totalCount);
-
-      if (filteredCharacters.length === 0) {
-        const keyword = normalizeSearchText(characterSearch.value);
-        characterGrid.innerHTML = keyword
-          ? `<div class="hint">検索条件に一致するキャラクターがありません。</div>`
-          : `<div class="hint">このカテゴリにはキャラクターがありません。</div>`;
+      if (list.length === 0) {
+        personaList.innerHTML = `<div class="hint">絵師ペルソナが見つかりません。</div>`;
         return;
       }
 
-      const fragment = document.createDocumentFragment();
+      for (const persona of list) {
+        const card = document.createElement("div");
+        card.className = `select-card ${selectedPersonaIds.includes(persona.id) ? "selected" : ""}`;
 
-      for (const character of filteredCharacters) {
-        if (renderToken !== characterRenderToken) return;
+        const signedUrl = await getSignedImageUrl(persona.image_url, "persona");
 
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "character-button";
-        button.dataset.id = character.id;
-
-        if (selectedCharacters.some((item) => item.id === character.id)) {
-          button.classList.add("selected");
-        }
-
-        const signedUrl = await getSignedImageUrl(character.image_url, "character");
-
-        if (renderToken !== characterRenderToken) return;
-
-        button.innerHTML = `
+        card.innerHTML = `
           ${
             signedUrl
-              ? `<img class="character-thumb" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(character.name)}">`
-              : `<div class="character-placeholder">No Image</div>`
+              ? `<img class="thumb persona" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(persona.name)}">`
+              : `<div class="thumb persona"></div>`
           }
-          <div>
-            <strong>${escapeHtml(character.name)}</strong>
-            <div class="meta">${escapeHtml(getShortText(character.base_prompt, 120))}</div>
+          <div class="card-body">
+            <div class="card-title">${escapeHtml(persona.name)}</div>
+            <div class="card-meta">カテゴリ：${escapeHtml(getPersonaCategoryName(persona.category_id))}</div>
+            <div class="card-meta">${escapeHtml(shortText(persona.system_instruction, 120))}</div>
           </div>
         `;
 
-        button.addEventListener("click", () => {
-          toggleCharacter(character);
+        card.addEventListener("click", async () => {
+          togglePersona(persona.id);
+          await renderPersonaCards();
         });
 
-        fragment.appendChild(button);
+        personaList.appendChild(card);
       }
-
-      if (renderToken !== characterRenderToken) return;
-
-      characterGrid.innerHTML = "";
-      characterGrid.appendChild(fragment);
     }
 
-    function toggleCharacter(character) {
-      const exists = selectedCharacters.some((item) => item.id === character.id);
+    async function renderCharacterCards() {
+      const list = getFilteredCharacters();
+      characterList.innerHTML = "";
 
-      if (exists) {
-        selectedCharacters = selectedCharacters.filter((item) => item.id !== character.id);
-      } else {
-        selectedCharacters.push(character);
-      }
-
-      renderCharacters();
-      renderSelectedCharacterSummary();
-    }
-
-    function removeCharacter(id) {
-      selectedCharacters = selectedCharacters.filter((character) => character.id !== id);
-      renderCharacters();
-      renderSelectedCharacterSummary();
-    }
-
-    function clearSelectedCharacters() {
-      selectedCharacters = [];
-      renderCharacters();
-      renderSelectedCharacterSummary();
-      setStatus("選択中キャラクターを全解除しました。", "success");
-    }
-
-    function clearCharacterSearch() {
-      characterSearch.value = "";
-      renderCharacters();
-      setStatus("キャラクター検索をクリアしました。", "success");
-    }
-
-    function renderSelectedCharacterSummary() {
-      selectedCharacterSummary.innerHTML = "";
-
-      if (selectedCharacters.length === 0) {
-        selectedCharacterSummary.innerHTML = `<span class="hint">キャラクター未選択</span>`;
+      if (list.length === 0) {
+        characterList.innerHTML = `<div class="hint">キャラクターが見つかりません。</div>`;
         return;
       }
 
-      selectedCharacters.forEach((character) => {
-        const chip = document.createElement("span");
-        chip.className = "selected-chip";
-        chip.innerHTML = `
-          <span>${escapeHtml(character.name)}</span>
-          <button type="button" aria-label="解除">×</button>
+      for (const character of list) {
+        const card = document.createElement("div");
+        card.className = `select-card ${selectedCharacterIds.includes(character.id) ? "selected" : ""}`;
+
+        const signedUrl = await getSignedImageUrl(character.image_url, "character");
+
+        card.innerHTML = `
+          ${
+            signedUrl
+              ? `<img class="thumb" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(character.name)}">`
+              : `<div class="thumb"></div>`
+          }
+          <div class="card-body">
+            <div class="card-title">${escapeHtml(character.name)}</div>
+            <div class="card-meta">カテゴリ：${escapeHtml(getCharacterCategoryName(character.category_id))}</div>
+            <div class="card-meta">${escapeHtml(shortText(character.base_prompt, 120))}</div>
+          </div>
         `;
-        chip.querySelector("button").addEventListener("click", () => {
-          removeCharacter(character.id);
+
+        card.addEventListener("click", async () => {
+          toggleCharacter(character.id);
+          await renderCharacterCards();
         });
-        selectedCharacterSummary.appendChild(chip);
-      });
+
+        characterList.appendChild(card);
+      }
     }
 
-    function buildCollabPatternBlock() {
-      if (selectedPersonas.length === 0) {
-        return `
-絵師ペルソナは未選択です。
-一般的で高品質な画像生成プロンプトとして作成してください。
-ただし、可能な限り一貫した画風、構図、色彩設計、ライティング、質感、雰囲気を持つ完成度の高い表現にしてください。
-`.trim();
+    function togglePersona(id) {
+      if (selectedPersonaIds.includes(id)) {
+        selectedPersonaIds = selectedPersonaIds.filter((item) => item !== id);
+        renderSelectedSummary();
+        return;
       }
 
-      if (selectedPersonas.length === 1) {
-        const persona = selectedPersonas[0];
-        const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
-
-        return `
-選択された絵師ペルソナ：
-- ${persona.name}
-- 絵師カテゴリ：${categoryName}
-- 胸像画像パス：${persona.image_url || "未設定"}
-
-画風優先ルール：
-- この絵師ペルソナの system_instruction を画面全体の支配的な画風として強く反映してください。
-- 線画、塗り、色彩設計、ライティング、陰影、構図、遠近感、背景処理、質感、空気感、演出のすべてで、この絵師ペルソナの特徴を明確に押し出してください。
-- キャラクター設定は「何を描くか」を決める情報であり、絵師ペルソナは「どう描くか」を決める最優先情報です。
-- 最終プロンプトでは、画風を末尾に軽く付け足すのではなく、冒頭から一貫して強く反映してください。
-`.trim();
+      if (selectedPersonaIds.length >= MAX_PERSONA_SELECTION) {
+        alert(`絵師ペルソナは最大${MAX_PERSONA_SELECTION}名まで選択できます。`);
+        return;
       }
 
-      const personaA = selectedPersonas[0];
-      const personaB = selectedPersonas[1];
-      const pattern = collabPattern.value || "auto";
-
-      const personaACategory = getPersonaCategoryNameById(personaA.category_id) || "未設定";
-      const personaBCategory = getPersonaCategoryNameById(personaB.category_id) || "未設定";
-
-      return `
-選択された絵師ペルソナ：
-- A：${personaA.name}
-  - 絵師カテゴリ：${personaACategory}
-  - 胸像画像パス：${personaA.image_url || "未設定"}
-- B：${personaB.name}
-  - 絵師カテゴリ：${personaBCategory}
-  - 胸像画像パス：${personaB.image_url || "未設定"}
-
-共創パターン：
-${COLLAB_PATTERN_LABELS[pattern] || COLLAB_PATTERN_LABELS.auto}
-
-画風優先ルール：
-- AとBの画風を破綻なく統合してください。
-- 共創パターンに応じて、AとBの担当領域を明確に分担してください。
-- ただし単なる寄せ集めではなく、画面全体として一体感のある完成された1枚にしてください。
-- 線画、塗り、色彩設計、ライティング、陰影、構図、遠近感、背景処理、質感、空気感、演出において、両者の特徴がはっきり分かるように強く押し出してください。
-- キャラクター設定は「何を描くか」を決める情報であり、絵師ペルソナは「どう描くか」を決める最優先情報です。
-- 最終プロンプトでは、A/Bの画風を単なる補足として末尾に書くのではなく、冒頭から全体の画風ルールとして明確に記述してください。
-`.trim();
+      selectedPersonaIds.push(id);
+      renderSelectedSummary();
     }
 
-    function buildNoneOptionsBlock() {
-      const checkedValues = getSelectedNoneOptions();
-
-      if (checkedValues.length === 0) {
-        return "";
+    function toggleCharacter(id) {
+      if (selectedCharacterIds.includes(id)) {
+        selectedCharacterIds = selectedCharacterIds.filter((item) => item !== id);
+      } else {
+        selectedCharacterIds.push(id);
       }
 
-      const lines = checkedValues.map((value) => `- ${NONE_OPTION_LABELS[value] || value}`);
-
-      return `
-文字・ロゴ制御（内部処理ルール）：
-${lines.join("\n")}
-
-内部処理ルール：
-- これは内部判断用のルールです。最終的な English Prompt / 日本語プロンプト に、この制御文そのものをそのまま出力しないでください。
-- 最終プロンプトには、「no text」「no readable text」「no other text」「without text」「do not add text」「文字なし」「読める文字なし」「〜以外の文字はなし」のような禁止文・否定文を含めないでください。
-- 最終プロンプトでは、必要な場合に限り、表示すべきキャラクター固有マーキングだけを肯定文で自然に記述してください。
-- 選択キャラクターの固有ロゴ、服装文字、装備文字、社名、識別ラベル、ワッペン、標語などはキャラクター固有マーキングとして保持してください。
-- 背景や環境に余計な文字・ロゴを増やしすぎない判断は内部で行い、最終プロンプトでは背景描写を自然に書くことで調整してください。
-
-Internal handling rule:
-- This is an internal control rule. Do not echo these control sentences directly in the final English Prompt or Japanese Prompt.
-- Do not include negative restriction phrases in the final prompt such as "no text", "no readable text", "no other text", "without text", "do not add text", or equivalent Japanese prohibitive wording.
-- In the final prompt, only mention visible character-specific markings positively and naturally when needed.
-- Preserve selected character-specific logos, clothing text, equipment labels, company names, badges, slogans, and identifying markings as part of character identity.
-- Control excess background text or unrelated logos internally, without turning the final prompt into a list of prohibitions.
-`.trim();
+      renderSelectedSummary();
     }
 
-    function buildCharacterPromptBlock() {
-      if (selectedCharacters.length === 0) {
-        return "選択キャラクターはありません。";
+    function getSelectedPersonas() {
+      return selectedPersonaIds
+        .map((id) => personas.find((item) => item.id === id))
+        .filter(Boolean);
+    }
+
+    function getSelectedCharacters() {
+      return selectedCharacterIds
+        .map((id) => characters.find((item) => item.id === id))
+        .filter(Boolean);
+    }
+
+    function renderSelectedSummary() {
+      const selectedPersonas = getSelectedPersonas();
+      const selectedCharacters = getSelectedCharacters();
+
+      if (selectedPersonas.length === 0 && selectedCharacters.length === 0) {
+        selectedSummary.innerHTML = "まだ選択されていません。";
+        return;
       }
 
-      const lines = selectedCharacters.map((character, index) => {
-        const categoryName = getCategoryNameById(character.category_id) || "未設定";
+      const personaHtml = selectedPersonas.length
+        ? selectedPersonas
+            .map((persona, index) => {
+              const slot = index === 0 ? "A" : "B";
+              return `<span class="pill">絵師${slot}: ${escapeHtml(persona.name)}</span>`;
+            })
+            .join("")
+        : `<span class="pill">絵師未選択</span>`;
 
-        return `
-${index + 1}. ${character.name}
+      const characterHtml = selectedCharacters.length
+        ? selectedCharacters
+            .map((character) => `<span class="pill">${escapeHtml(character.name)}</span>`)
+            .join("")
+        : `<span class="pill">キャラクター未選択</span>`;
 
-カテゴリ：
-${categoryName}
-
-キャラクター基本設定：
-${character.base_prompt || "未設定"}
-
-キャラクター画像パス：
-${character.image_url || "未設定"}
-
-重要：
-- このキャラクター設定に含まれるロゴ、服装文字、ヘルメット文字、ワッペン、社名、標語、装備上の表記、識別ラベルなどは、キャラクター固有のデザイン要素です。
-- ユーザーが明示的に削除を指示しない限り、これらは保持してください。
-- 最終プロンプトでは、必要に応じてこれらを自然な肯定文で記述してください。
-- 「〜以外の文字はなし」のような禁止文には変換しないでください。
-`.trim();
-      });
-
-      return `
-選択キャラクター一覧：
-${lines.join("\n\n")}
-`.trim();
+      selectedSummary.innerHTML = `
+        <div>${personaHtml}</div>
+        <div style="margin-top:6px;">${characterHtml}</div>
+      `;
     }
 
     function buildStyleOutputRuleBlock() {
       return `
-最終出力の画風ルール：
-- 最終的な English Prompt / 日本語プロンプトは、まず画風・描画方針を強く明示するスタイル記述から始めてください。
-- 画風記述では、少なくとも以下を強く反映してください：
-  - linework / 主線
-  - rendering / 塗り・レンダリング
-  - color design / 色彩設計
-  - lighting / ライティング
-  - composition / 構図
-  - perspective / パース・視点
-  - texture or finish / 質感・仕上げ
-  - mood or atmosphere / 雰囲気・空気感
-- 選択された絵師ペルソナがいる場合、その画風を画面全体の支配的なルールとして扱ってください。
-- キャラクター設定は絵柄を弱めるための情報ではありません。キャラクターの同一性を保ちつつ、絵師の画風のほうを強く押し出してください。
-- 最終プロンプトでは、絵師の画風を「最後に一言だけ添える補足」にしないでください。画風は冒頭から主役として記述してください。
-- 絵師が2名いる場合は、共創パターンに応じて、どの要素にどちらの強みが出るかを自然に反映してください。
+【画風出力ルール】
+絵師ペルソナは、最終画像の「どう描くか」を決定する最重要要素です。
+キャラクター設定は「何を描くか」を決定します。
+画風を最後に軽く添えるのではなく、最終プロンプト冒頭から画風を強く反映してください。
+
+必ず反映する観点：
+- 主線
+- 塗り・レンダリング
+- 色彩設計
+- ライティング
+- 構図
+- パース・カメラ
+- 質感・仕上げ
+- 雰囲気・空気感
 `.trim();
+    }
+
+    function buildCollabPatternBlock(selectedPersonas) {
+      if (selectedPersonas.length <= 1) {
+        return `
+【共創パターン】
+単独絵師モード。
+選択された絵師Aの画風を、キャラクター、背景、構図、色彩、ライティング、質感、空気感を含む画面全体へ強く適用してください。
+`.trim();
+      }
+
+      const patternLabelMap = {
+        auto: "おまかせ統合",
+        character_a_background_b: "キャラ絵師A + 背景絵師B",
+        background_a_character_b: "背景絵師A + キャラ絵師B",
+        left_a_right_b: "左側A + 右側B",
+        top_a_bottom_b: "上側A + 下側B",
+        foreground_a_background_b: "前景A + 背景B",
+        main_a_effect_b: "主役A + 演出B",
+      };
+
+      const value = collabPattern.value;
+
+      return `
+【共創パターン】
+${patternLabelMap[value] || "おまかせ統合"}
+
+絵師Aと絵師Bを曖昧に平均化せず、指定された共創パターンに応じて担当領域を明確に分けてください。
+最終プロンプトには、必ず "Style role split:" と「画風分担：」を含め、A/Bの支配対象を具体的に書いてください。
+`.trim();
+    }
+
+    function buildNoneOptionsBlock() {
+      const policy = textPolicy.value;
+
+      if (policy === "free") {
+        return `
+【文字・ロゴ制御】
+文字・ロゴの制限は設けません。
+ただし、不要な説明文やUI文字を画面に増やす必要はありません。
+`.trim();
+      }
+
+      if (policy === "allow_needed") {
+        return `
+【文字・ロゴ制御】
+必要な文字・ロゴ・衣装マーキングは自然に扱ってください。
+最終プロンプトでは禁止文ではなく、必要な要素だけを肯定文で記述してください。
+`.trim();
+      }
+
+      return `
+【文字・ロゴ制御】
+キャラクター固有マーキングは保持してください。
+キャラクター固有マーキングとは、服装ロゴ、社名、装備ラベル、ヘルメット文字、ワッペン、標語、識別マークなど、キャラクター設定に含まれる固有要素です。
+
+重要：
+最終プロンプトには次のような禁止文を出力しないでください。
+- no text
+- no readable text
+- no other text
+- without text
+- 文字なし
+- 読める文字なし
+- 〜以外の文字はなし
+- キャラクター固有マーキング以外の文字はなし
+
+必要な固有マーキングは、肯定文で自然に記述してください。
+`.trim();
+    }
+
+    function buildPersonaPromptBlock(selectedPersonas) {
+      if (selectedPersonas.length === 0) {
+        return "【絵師ペルソナ】\n未選択";
+      }
+
+      return selectedPersonas
+        .map((persona, index) => {
+          const slot = index === 0 ? "A" : "B";
+
+          return `
+【絵師${slot}：${persona.name}】
+カテゴリ：${getPersonaCategoryName(persona.category_id)}
+system_instruction:
+${persona.system_instruction || ""}
+`.trim();
+        })
+        .join("\n\n");
+    }
+
+    function buildCharacterPromptBlock(selectedCharacters) {
+      if (selectedCharacters.length === 0) {
+        return "【キャラクター】\n未選択";
+      }
+
+      return selectedCharacters
+        .map((character) => {
+          return `
+【キャラクター：${character.name}】
+カテゴリ：${getCharacterCategoryName(character.category_id)}
+base_prompt:
+${character.base_prompt || ""}
+`.trim();
+        })
+        .join("\n\n");
     }
 
     function buildCombinedSystemInstruction() {
-      const personaInstructions = selectedPersonas.map((persona, index) => {
-        const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
-
-        return `
-【絵師${index === 0 ? "A" : "B"}：${persona.name}】
-絵師カテゴリ：${categoryName}
-胸像画像パス：${persona.image_url || "未設定"}
-
-system_instruction：
-${persona.system_instruction || ""}
-`.trim();
-      });
+      const selectedPersonas = getSelectedPersonas();
 
       return `
-あなたは画像生成プロンプト作成の専門家です。
-ユーザーの日本語指示をもとに、画像生成AI向けの高品質なプロンプトを作成してください。
-
-重要：
-- 出力は必ず「## English Prompt」と「## 日本語プロンプト」の2見出しだけにしてください。
-- メモ、解説、補足、Markdown表、コードブロックは出力しないでください。
-- English Prompt は画像生成AIへそのまま入力できる自然な英語にしてください。
-- 日本語プロンプトは、English Promptの内容を確認しやすい自然な日本語にしてください。
-- 選択されたキャラクター名は、そのまま尊重してください。
-- キャラクターの base_prompt がある場合は、外見、服装、役割、世界観、装備、関係性などの内容面を優先して反映してください。
-- 選択キャラクターに含まれるロゴ、社名、服の文字、装備ラベル、識別マーク、ワッペン、標語などは、キャラクター固有マーキングとして扱ってください。
-- 絵師ペルソナが選択されている場合、絵師の system_instruction は画面全体の支配的な画風ルールとして、キャラクター設定より強く反映してください。
-- 言い換えると、キャラクター設定は「何を描くか」を決め、絵師ペルソナは「どう描くか」を決めます。
-- 最終出力では、画風、主線、塗り、色彩、ライティング、構図、質感、雰囲気を強く押し出してください。
-- 画風は補足ではなく主役です。最終プロンプトの冒頭から強く記述してください。
-- 文字・ロゴ制御が指定されている場合でも、それは内部処理ルールであり、最終プロンプトを禁止文の羅列にしないでください。
-- 最終プロンプトには「文字なし」「no text」「no readable text」「〜以外の文字はなし」などの否定文・禁止文を含めないでください。
-- 最終プロンプトでは、必要に応じて表示すべきキャラクター固有マーキングだけを自然な肯定文で記述してください。
-- 絵師ペルソナの胸像画像は、画面上で選択補助として使う参考情報です。画像そのものを直接読んだ前提で断定しないでください。
-- 矛盾がある場合は確認質問をせず、キャラクター固有デザインを保持しつつ、絵師の画風をより強く優先してプロンプトを完成させてください。
+あなたは、画像生成AI向けの完成プロンプトを作成する専門家です。
+出力は「## English Prompt」と「## 日本語プロンプト」の2つだけにしてください。
 
 ${buildStyleOutputRuleBlock()}
 
-${personaInstructions.join("\n\n")}
-
-${buildCollabPatternBlock()}
+${buildCollabPatternBlock(selectedPersonas)}
 
 ${buildNoneOptionsBlock()}
+
+最終出力では、画風を冒頭から強く出してください。
+キャラクター設定は保持しつつ、描き方は絵師ペルソナの画風を優先してください。
 `.trim();
     }
 
-    function splitGeneratedText(text) {
-      const englishMatch = text.match(/## English Prompt\s*([\s\S]*?)(?=## 日本語プロンプト|$)/);
-      const japaneseMatch = text.match(/## 日本語プロンプト\s*([\s\S]*?)$/);
-
-      return {
-        english: englishMatch ? englishMatch[1].trim() : "",
-        japanese: japaneseMatch ? japaneseMatch[1].trim() : "",
-      };
-    }
-
-    function getHistory() {
-      try {
-        const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-
-        if (!Array.isArray(parsed)) {
-          return [];
-        }
-
-        return parsed;
-      } catch {
-        return [];
-      }
-    }
-
-    function setHistory(items) {
-      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(items));
-    }
-
-    function createHistorySnapshot({ english, japanese }) {
-      return {
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-
-        modelName: modelName.value,
-
-        sceneText: sceneText.value,
-        extraText: extraText.value,
-
-        personaCategoryId: personaCategorySelect.value,
-        personaSearch: personaSearch.value,
-        selectedPersonaIds: selectedPersonas.map((persona) => persona.id),
-        selectedPersonaNames: selectedPersonas.map((persona) => persona.name),
-
-        collabPattern: collabPattern.value,
-
-        characterCategoryId: categorySelect.value,
-        characterSearch: characterSearch.value,
-        selectedCharacterIds: selectedCharacters.map((character) => character.id),
-        selectedCharacterNames: selectedCharacters.map((character) => character.name),
-
-        noneOptions: getSelectedNoneOptions(),
-
-        englishPrompt: english,
-        japanesePrompt: japanese,
-      };
-    }
-
-    function saveHistory(snapshot) {
-      const current = getHistory();
-
-      const next = [
-        snapshot,
-        ...current.filter((item) => item.id !== snapshot.id),
-      ].slice(0, MAX_HISTORY_ITEMS);
-
-      setHistory(next);
-      renderHistory();
-    }
-
-    function formatHistoryDate(isoString) {
-      try {
-        const date = new Date(isoString);
-
-        return date.toLocaleString("ja-JP", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
-      } catch {
-        return isoString || "";
-      }
-    }
-
-    function safeFileName(text) {
-      return String(text || "history")
-        .normalize("NFKC")
-        .replace(/[\\/:*?"<>|#%{}^~[\]`]/g, "-")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-|-$/g, "")
-        .slice(0, 80) || "history";
-    }
-
-    function buildHistoryExportPayload(item) {
-      const selectedPersonaIds = Array.isArray(item.selectedPersonaIds)
-        ? item.selectedPersonaIds
-        : [];
-
-      const selectedCharacterIds = Array.isArray(item.selectedCharacterIds)
-        ? item.selectedCharacterIds
-        : [];
-
-      const exportPersonas = selectedPersonaIds.map((idValue, index) => {
-        const persona = personas.find((item) => item.id === idValue);
-        const fallbackName = Array.isArray(item.selectedPersonaNames)
-          ? item.selectedPersonaNames[index]
-          : "";
-
-        if (!persona) {
-          return {
-            id: idValue,
-            name: fallbackName || "",
-            missingFromCurrentDatabase: true,
-          };
-        }
-
-        const category = getPersonaCategoryById(persona.category_id);
-
-        return {
-          id: persona.id,
-          name: persona.name || "",
-          categoryId: persona.category_id || null,
-          categoryName: category ? category.name : "",
-          imageUrl: persona.image_url || "",
-          isActive: Boolean(persona.is_active),
-          sortOrder: persona.sort_order ?? null,
-          systemInstruction: persona.system_instruction || "",
-          missingFromCurrentDatabase: false,
-        };
-      });
-
-      const exportCharacters = selectedCharacterIds.map((idValue, index) => {
-        const character = characters.find((item) => item.id === idValue);
-        const fallbackName = Array.isArray(item.selectedCharacterNames)
-          ? item.selectedCharacterNames[index]
-          : "";
-
-        if (!character) {
-          return {
-            id: idValue,
-            name: fallbackName || "",
-            missingFromCurrentDatabase: true,
-          };
-        }
-
-        const category = getCharacterCategoryById(character.category_id);
-
-        return {
-          id: character.id,
-          name: character.name || "",
-          categoryId: character.category_id || null,
-          categoryName: category ? category.name : "",
-          imageUrl: character.image_url || "",
-          sortOrder: character.sort_order ?? null,
-          basePrompt: character.base_prompt || "",
-          characterDesignTextPriority:
-            "Selected character-specific logos, labels, equipment markings, clothing text, badges, slogans, and identity markings should be preserved unless the user explicitly asks to remove them.",
-          missingFromCurrentDatabase: false,
-        };
-      });
-
-      const noneOptions = Array.isArray(item.noneOptions) ? item.noneOptions : [];
-
-      return {
-        schema: "artist_prompt_studio_history_settings_v2",
-        exportedAt: new Date().toISOString(),
-        sourceApp: {
-          name: "Artist Prompt Studio",
-          storageKey: HISTORY_STORAGE_KEY,
-        },
-        history: {
-          id: item.id,
-          createdAt: item.createdAt,
-        },
-        model: {
-          name: item.modelName || "",
-        },
-        inputs: {
-          sceneText: item.sceneText || "",
-          extraText: item.extraText || "",
-        },
-        uiState: {
-          personaCategoryId: item.personaCategoryId || "",
-          personaCategoryName: item.personaCategoryId
-            ? getPersonaCategoryNameById(item.personaCategoryId)
-            : "すべての絵師カテゴリ",
-          personaSearch: item.personaSearch || "",
-          characterCategoryId: item.characterCategoryId || "",
-          characterCategoryName: item.characterCategoryId
-            ? getCategoryNameById(item.characterCategoryId)
-            : "",
-          characterSearch: item.characterSearch || "",
-        },
-        selectedSettings: {
-          personas: exportPersonas,
-          characters: exportCharacters,
-          collabPattern: item.collabPattern || "auto",
-          collabPatternLabel:
-            COLLAB_PATTERN_LABELS[item.collabPattern] || COLLAB_PATTERN_LABELS.auto,
-          textAndLogoControls: noneOptions.map((value) => {
-            return {
-              value,
-              label: NONE_OPTION_LABELS[value] || value,
-            };
-          }),
-          stylePriorityRule:
-            "Artist personas define the dominant rendering style of the entire image. Character settings define subject identity and content details. The artist style should be strongly emphasized from the beginning of the final prompt.",
-          characterTextPriorityRule:
-            "Text/logo controls are internal. Final prompts should avoid prohibition phrases and should only mention visible character-specific markings positively when needed.",
-        },
-        outputs: {
-          englishPrompt: item.englishPrompt || "",
-          japanesePrompt: item.japanesePrompt || "",
-        },
-        restoreHints: {
-          selectedPersonaIds,
-          selectedCharacterIds,
-          maxPersonaSelection: MAX_PERSONA_SELECTION,
-          note:
-            "このJSONは設定込みの履歴出力です。別ツールで利用する場合は selectedSettings と outputs を参照してください。",
-        },
-      };
-    }
-
-    function downloadJsonFile(fileName, data) {
-      const json = JSON.stringify(data, null, 2);
-      const blob = new Blob([json], {
-        type: "application/json;charset=utf-8",
-      });
-
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-
-      anchor.href = url;
-      anchor.download = fileName;
-
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-
-      URL.revokeObjectURL(url);
-    }
-
-    function exportHistorySettingsJson(id) {
-      const item = getHistory().find((historyItem) => historyItem.id === id);
-
-      if (!item) {
-        setStatus("出力対象の履歴が見つかりません。", "error");
-        return;
-      }
-
-      const payload = buildHistoryExportPayload(item);
-      const createdAt = String(item.createdAt || "")
-        .replace(/[-:]/g, "")
-        .replace(/\.\d+Z$/, "")
-        .replace("T", "-");
-
-      const title = safeFileName(item.sceneText || "artist-prompt-history");
-      const fileName = `artist-prompt-settings-${createdAt || "unknown"}-${title}.json`;
-
-      downloadJsonFile(fileName, payload);
-      setStatus("設定込みJSONを出力しました。", "success");
-    }
-
-    function renderHistory() {
-      const items = getHistory();
-      historyList.innerHTML = "";
-
-      if (items.length === 0) {
-        historyList.innerHTML = `
-          <div class="history-empty">
-            生成履歴はまだありません。プロンプト生成に成功すると、ここに保存されます。
-          </div>
-        `;
-        return;
-      }
-
-      items.forEach((item) => {
-        const div = document.createElement("div");
-        div.className = "history-item";
-
-        const title = item.sceneText
-          ? getShortText(item.sceneText, 54)
-          : "無題の生成履歴";
-
-        const personaNames = Array.isArray(item.selectedPersonaNames) && item.selectedPersonaNames.length > 0
-          ? item.selectedPersonaNames.join("、")
-          : "未選択";
-
-        const characterNames = Array.isArray(item.selectedCharacterNames) && item.selectedCharacterNames.length > 0
-          ? item.selectedCharacterNames.join("、")
-          : "未選択";
-
-        const noneOptionText = Array.isArray(item.noneOptions) && item.noneOptions.length > 0
-          ? item.noneOptions.map((value) => NONE_OPTION_LABELS[value] || value).join("、")
-          : "なし";
-
-        div.innerHTML = `
-          <strong>${escapeHtml(title)}</strong>
-          <div class="history-meta">
-日時：${escapeHtml(formatHistoryDate(item.createdAt))}
-モデル：${escapeHtml(item.modelName || "")}
-絵師：${escapeHtml(personaNames)}
-キャラクター：${escapeHtml(characterNames)}
-共創パターン：${escapeHtml(COLLAB_PATTERN_LABELS[item.collabPattern] || item.collabPattern || "auto")}
-文字・ロゴ制御：${escapeHtml(noneOptionText)}
-          </div>
-          <div class="actions">
-            <button class="secondary small" data-show="${escapeHtml(item.id)}">結果を表示</button>
-            <button class="primary small" data-restore="${escapeHtml(item.id)}">設定を復元</button>
-            <button class="secondary small" data-export-json="${escapeHtml(item.id)}">設定込みJSON出力</button>
-            <button class="danger small" data-delete="${escapeHtml(item.id)}">削除</button>
-          </div>
-        `;
-
-        div.querySelector("[data-show]").addEventListener("click", () => {
-          showHistoryResult(item.id);
-        });
-
-        div.querySelector("[data-restore]").addEventListener("click", async () => {
-          await restoreHistorySettings(item.id);
-        });
-
-        div.querySelector("[data-export-json]").addEventListener("click", () => {
-          exportHistorySettingsJson(item.id);
-        });
-
-        div.querySelector("[data-delete]").addEventListener("click", () => {
-          deleteHistoryItem(item.id);
-        });
-
-        historyList.appendChild(div);
-      });
-    }
-
-    function showHistoryResult(id) {
-      const item = getHistory().find((historyItem) => historyItem.id === id);
-
-      if (!item) {
-        setStatus("履歴が見つかりません。", "error");
-        return;
-      }
-
-      englishPrompt.textContent = item.englishPrompt || "";
-      japanesePrompt.textContent = item.japanesePrompt || "";
-
-      setStatus("履歴の生成結果を表示しました。", "success");
-    }
-
-    function deleteHistoryItem(id) {
-      const next = getHistory().filter((item) => item.id !== id);
-      setHistory(next);
-      renderHistory();
-      setStatus("履歴を削除しました。", "success");
-    }
-
-    function clearHistory() {
-      const ok = confirm("生成履歴をすべて削除しますか？");
-      if (!ok) return;
-
-      setHistory([]);
-      renderHistory();
-      setStatus("生成履歴をすべて削除しました。", "success");
-    }
-
-    async function restoreHistorySettings(id) {
-      const item = getHistory().find((historyItem) => historyItem.id === id);
-
-      if (!item) {
-        setStatus("履歴が見つかりません。", "error");
-        return;
-      }
-
-      modelName.value = item.modelName || modelName.value;
-
-      sceneText.value = item.sceneText || "";
-      extraText.value = item.extraText || "";
-
-      if (typeof item.personaCategoryId === "string") {
-        personaCategorySelect.value = item.personaCategoryId;
-      }
-
-      personaSearch.value = item.personaSearch || "";
-
-      const personaIds = Array.isArray(item.selectedPersonaIds)
-        ? item.selectedPersonaIds
-        : [];
-
-      selectedPersonas = personaIds
-        .map((idValue) => personas.find((persona) => persona.id === idValue))
-        .filter(Boolean);
-
-      if (selectedPersonas.length > MAX_PERSONA_SELECTION) {
-        selectedPersonas = selectedPersonas.slice(0, MAX_PERSONA_SELECTION);
-      }
-
-      collabPattern.value = item.collabPattern || "auto";
-
-      if (selectedPersonas.length < 2) {
-        collabPattern.value = "auto";
-        collabPattern.disabled = true;
-      } else {
-        collabPattern.disabled = false;
-      }
-
-      if (typeof item.characterCategoryId === "string") {
-        categorySelect.value = item.characterCategoryId;
-      }
-
-      characterSearch.value = item.characterSearch || "";
-
-      const characterIds = Array.isArray(item.selectedCharacterIds)
-        ? item.selectedCharacterIds
-        : [];
-
-      selectedCharacters = characterIds
-        .map((idValue) => characters.find((character) => character.id === idValue))
-        .filter(Boolean);
-
-      setSelectedNoneOptions(item.noneOptions || []);
-
-      englishPrompt.textContent = item.englishPrompt || "";
-      japanesePrompt.textContent = item.japanesePrompt || "";
-
-      await renderPersonas();
-      await renderCharacters();
-      renderSelectedPersonaSummary();
-      renderSelectedCharacterSummary();
-
-      const missingPersonaCount = personaIds.length - selectedPersonas.length;
-      const missingCharacterCount = characterIds.length - selectedCharacters.length;
-
-      if (missingPersonaCount > 0 || missingCharacterCount > 0) {
-        setStatus(
-          "履歴の設定を復元しました。ただし、削除済みの絵師またはキャラクターは復元できませんでした。",
-          "warning"
-        );
-      } else {
-        setStatus("履歴の設定を復元しました。", "success");
-      }
+    function buildCharacterPrompt() {
+      const selectedPersonas = getSelectedPersonas();
+      const selectedCharacters = getSelectedCharacters();
+
+      return `
+${buildPersonaPromptBlock(selectedPersonas)}
+
+${buildCharacterPromptBlock(selectedCharacters)}
+
+【シーン・状況】
+${sceneInput.value.trim() || "選択したキャラクターが印象的な場面にいる。"}
+
+【追加指示】
+${additionalInput.value.trim() || "キャラクター設定を保持し、絵師ペルソナの画風を強く反映する。"}
+
+【出力上の重要指示】
+- 画像生成AIへそのまま貼り付けられる完成プロンプトにしてください。
+- 画風、主役、シーン、背景、構図、アスペクト比を含めてください。
+- 2名の絵師が選択されている場合は、A/Bの支配対象を明確に書いてください。
+- 禁止文・否定文を最終プロンプトに含めないでください。
+`.trim();
     }
 
     async function generatePrompt() {
-      const scene = sceneText.value.trim();
-      const extra = extraText.value.trim();
-
-      if (!scene) {
-        setStatus("作りたい画像の内容を入力してください。", "error");
+      if (isGenerating) {
         return;
       }
 
-      generateBtn.disabled = true;
-      setStatus("プロンプトを生成しています...", "");
+      const remaining = getRemainingCooldownSeconds();
 
-      englishPrompt.textContent = "";
-      japanesePrompt.textContent = "";
+      if (remaining > 0) {
+        setStatus(
+          generateStatus,
+          `Gemini API無料枠対策のため待機中です。残り ${remaining} 秒後に再生成してください。`,
+          "warning"
+        );
+        updateCooldownUi();
+        return;
+      }
+
+      const selectedPersonas = getSelectedPersonas();
+      const selectedCharacters = getSelectedCharacters();
+
+      if (selectedPersonas.length === 0) {
+        setStatus(generateStatus, "絵師ペルソナを1名以上選択してください。", "error");
+        return;
+      }
+
+      if (selectedCharacters.length === 0) {
+        setStatus(generateStatus, "キャラクターを1名以上選択してください。", "error");
+        return;
+      }
+
+      isGenerating = true;
+      updateCooldownUi();
+      setStatus(generateStatus, "プロンプトを生成中です。Gemini APIへの呼び出しは1回だけ行います...", "");
+      resultBox.textContent = "生成中...";
 
       try {
-        const combinedSystemInstruction = buildCombinedSystemInstruction();
-
-        const characterPrompt = `
-ユーザーの作りたい画像：
-${scene}
-
-追加条件：
-${extra || "なし"}
-
-${buildCharacterPromptBlock()}
-`.trim();
-
         const response = await fetch(FUNCTION_URL, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            systemInstruction: combinedSystemInstruction,
-            characterPrompt,
-            modelName: modelName.value,
+            modelName: modelSelect.value,
+            systemInstruction: buildCombinedSystemInstruction(),
+            characterPrompt: buildCharacterPrompt(),
           }),
         });
 
         const data = await response.json();
 
         if (!response.ok || data.error) {
-          throw new Error(data.error || "プロンプト生成に失敗しました。");
+          throw new Error(data.error || "生成に失敗しました。");
         }
 
-        const rawText = data.text || data.result || "";
-        const split = splitGeneratedText(rawText);
+        const text = data.text || data.result || "";
 
-        const english = split.english || rawText;
-        const japanese = split.japanese || "";
+        resultBox.textContent = text || "生成結果が空でした。";
 
-        englishPrompt.textContent = english;
-        japanesePrompt.textContent = japanese;
+        if (data.warning) {
+          setStatus(
+            generateStatus,
+            `生成しました。ただし警告があります：\n${data.warning}`,
+            "warning"
+          );
+        } else {
+          setStatus(generateStatus, "プロンプトを生成しました。", "success");
+        }
 
-        saveHistory(createHistorySnapshot({
-          english,
-          japanese,
-        }));
+        saveHistory({
+          text,
+          warning: data.warning || "",
+          modelName: data.modelName || modelSelect.value,
+          geminiRequestCount: data.geminiRequestCount || 1,
+        });
 
-        setStatus("プロンプトを生成しました。生成履歴にも保存しました。", "success");
+        setCooldown(DEFAULT_COOLDOWN_SECONDS);
       } catch (error) {
-        setStatus(`生成エラー：${error.message}`, "error");
+        const message = error.message || String(error);
+
+        if (isQuotaError(message)) {
+          const retrySeconds = extractRetrySecondsFromError(message);
+          const waitSeconds = Math.max(retrySeconds, 60);
+
+          setCooldown(waitSeconds);
+
+          setStatus(
+            generateStatus,
+            `生成エラー：Gemini APIの無料枠または短時間上限に達しています。\n\n${message}\n\n${waitSeconds}秒後に再試行してください。`,
+            "error"
+          );
+
+          resultBox.innerHTML = `
+<div class="error-box">
+Gemini APIのquota制限に達しました。
+
+待機時間：${waitSeconds}秒
+
+対策：
+・この画面で待機する
+・複数タブで生成しない
+・連続クリックしない
+・必要に応じてGoogle AI Studio側の利用状況や課金設定を確認する
+</div>
+`;
+        } else {
+          setStatus(generateStatus, `生成エラー：${message}`, "error");
+          resultBox.textContent = "生成に失敗しました。";
+          setCooldown(15);
+        }
       } finally {
-        generateBtn.disabled = false;
+        isGenerating = false;
+        updateCooldownUi();
       }
     }
 
-    async function copyText(text, label) {
-      if (!text) {
-        setStatus(`${label}が空です。`, "warning");
+    async function copyResult() {
+      const text = resultBox.textContent.trim();
+
+      if (!text || text === "ここに生成結果が表示されます。") {
+        setStatus(generateStatus, "コピーする生成結果がありません。", "warning");
         return;
       }
 
       try {
         await navigator.clipboard.writeText(text);
-        setStatus(`${label}をコピーしました。`, "success");
+        setStatus(generateStatus, "生成結果をコピーしました。", "success");
       } catch {
-        setStatus(`${label}のコピーに失敗しました。`, "error");
+        setStatus(generateStatus, "コピーに失敗しました。", "error");
       }
     }
 
-    function clearInputs() {
-      sceneText.value = "";
-      extraText.value = "";
-      englishPrompt.textContent = "";
-      japanesePrompt.textContent = "";
-      setStatus("入力と生成結果をクリアしました。", "success");
+    function getHistory() {
+      try {
+        return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]");
+      } catch {
+        return [];
+      }
     }
 
-    personaCategorySelect.addEventListener("change", async () => {
-      await renderPersonas();
-    });
+    function saveHistory(entry) {
+      const selectedPersonas = getSelectedPersonas();
+      const selectedCharacters = getSelectedCharacters();
 
-    personaSearch.addEventListener("input", async () => {
-      await renderPersonas();
-    });
+      const history = getHistory();
 
-    clearPersonaSearchBtn.addEventListener("click", clearPersonaSearch);
+      history.unshift({
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+        modelName: entry.modelName,
+        geminiRequestCount: entry.geminiRequestCount,
+        warning: entry.warning,
+        text: entry.text,
+        settings: {
+          selectedPersonaIds,
+          selectedCharacterIds,
+          collabPattern: collabPattern.value,
+          textPolicy: textPolicy.value,
+          sceneInput: sceneInput.value,
+          additionalInput: additionalInput.value,
+          personaNames: selectedPersonas.map((item) => item.name),
+          characterNames: selectedCharacters.map((item) => item.name),
+        },
+      });
 
-    categorySelect.addEventListener("change", async () => {
-      await renderCharacters();
-    });
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 20)));
+      renderHistory();
+    }
 
-    characterSearch.addEventListener("input", async () => {
-      await renderCharacters();
-    });
+    function renderHistory() {
+      const history = getHistory();
+      historyList.innerHTML = "";
 
-    clearCharacterSearchBtn.addEventListener("click", clearCharacterSearch);
+      if (history.length === 0) {
+        historyList.innerHTML = `<div class="hint">履歴はありません。</div>`;
+        return;
+      }
 
-    clearCharactersBtn.addEventListener("click", clearSelectedCharacters);
+      history.forEach((item) => {
+        const div = document.createElement("div");
+        div.className = "history-item";
+
+        const date = new Date(item.createdAt);
+        const personaNames = item.settings?.personaNames?.join(" / ") || "絵師不明";
+        const characterNames = item.settings?.characterNames?.join(" / ") || "キャラ不明";
+
+        div.innerHTML = `
+          <div class="history-title">${escapeHtml(characterNames)}</div>
+          <div class="history-meta">
+            ${escapeHtml(date.toLocaleString())}<br>
+            絵師：${escapeHtml(personaNames)}<br>
+            モデル：${escapeHtml(item.modelName || "")}
+          </div>
+          <div class="actions">
+            <button class="secondary small" data-restore="${item.id}">設定復元</button>
+            <button class="secondary small" data-copy="${item.id}">結果コピー</button>
+            <button class="danger small" data-delete="${item.id}">削除</button>
+          </div>
+        `;
+
+        div.querySelector("[data-restore]").addEventListener("click", async () => {
+          restoreHistory(item);
+        });
+
+        div.querySelector("[data-copy]").addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(item.text || "");
+            setStatus(generateStatus, "履歴の生成結果をコピーしました。", "success");
+          } catch {
+            setStatus(generateStatus, "コピーに失敗しました。", "error");
+          }
+        });
+
+        div.querySelector("[data-delete]").addEventListener("click", () => {
+          deleteHistory(item.id);
+        });
+
+        historyList.appendChild(div);
+      });
+    }
+
+    async function restoreHistory(item) {
+      const settings = item.settings || {};
+
+      selectedPersonaIds = Array.isArray(settings.selectedPersonaIds)
+        ? settings.selectedPersonaIds
+        : [];
+
+      selectedCharacterIds = Array.isArray(settings.selectedCharacterIds)
+        ? settings.selectedCharacterIds
+        : [];
+
+      collabPattern.value = settings.collabPattern || "auto";
+      textPolicy.value = settings.textPolicy || "character_markings_only";
+      sceneInput.value = settings.sceneInput || "";
+      additionalInput.value = settings.additionalInput || "";
+
+      resultBox.textContent = item.text || "";
+
+      await renderPersonaCards();
+      await renderCharacterCards();
+      renderSelectedSummary();
+
+      setStatus(generateStatus, "履歴から設定を復元しました。", "success");
+    }
+
+    function deleteHistory(id) {
+      const history = getHistory().filter((item) => item.id !== id);
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+      renderHistory();
+    }
+
+    function clearHistory() {
+      if (!confirm("生成履歴をすべて削除しますか？")) {
+        return;
+      }
+
+      localStorage.removeItem(HISTORY_KEY);
+      renderHistory();
+      setStatus(generateStatus, "履歴を削除しました。", "success");
+    }
+
+    function exportSettingsJson() {
+      const selectedPersonas = getSelectedPersonas();
+      const selectedCharacters = getSelectedCharacters();
+
+      const data = {
+        schema: "artist_prompt_studio_history_settings_v2",
+        exportedAt: new Date().toISOString(),
+        modelName: modelSelect.value,
+        collabPattern: collabPattern.value,
+        textPolicy: textPolicy.value,
+        selectedPersonas: selectedPersonas.map((persona, index) => ({
+          slot: index === 0 ? "A" : "B",
+          id: persona.id,
+          name: persona.name,
+          category: getPersonaCategoryName(persona.category_id),
+          system_instruction: persona.system_instruction,
+        })),
+        selectedCharacters: selectedCharacters.map((character) => ({
+          id: character.id,
+          name: character.name,
+          category: getCharacterCategoryName(character.category_id),
+          base_prompt: character.base_prompt,
+        })),
+        scene: sceneInput.value,
+        additional: additionalInput.value,
+        result: resultBox.textContent,
+      };
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `artist-prompt-settings-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    personaCategoryFilter.addEventListener("change", renderPersonaCards);
+    personaSearch.addEventListener("input", renderPersonaCards);
+
+    characterCategoryFilter.addEventListener("change", renderCharacterCards);
+    characterSearch.addEventListener("input", renderCharacterCards);
 
     generateBtn.addEventListener("click", generatePrompt);
-
-    clearInputBtn.addEventListener("click", clearInputs);
-
-    copyEnglishBtn.addEventListener("click", () => {
-      copyText(englishPrompt.textContent, "English Prompt");
-    });
-
-    copyJapaneseBtn.addEventListener("click", () => {
-      copyText(japanesePrompt.textContent, "日本語プロンプト");
-    });
-
-    reloadHistoryBtn.addEventListener("click", () => {
-      renderHistory();
-      setStatus("生成履歴を再読み込みしました。", "success");
-    });
-
+    copyResultBtn.addEventListener("click", copyResult);
+    exportSettingsBtn.addEventListener("click", exportSettingsJson);
     clearHistoryBtn.addEventListener("click", clearHistory);
 
-    loadInitialData();
+    updateCooldownUi();
+    startCooldownTimer();
+
+    loadInitialData().catch((error) => {
+      setStatus(generateStatus, `初期読み込みエラー：${error.message}`, "error");
+    });
   </script>
 </body>
 </html>
