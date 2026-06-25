@@ -542,7 +542,10 @@
           <input type="hidden" id="personaCategoryId" />
 
           <label for="personaCategoryName">絵師カテゴリ名</label>
-          <input id="personaCategoryName" placeholder="例：ナガノAI系" />
+          <input id="personaCategoryName" placeholder="例：NaganoAI" />
+          <p class="hint">
+            Storageの保存先フォルダ名として自動入力される場合があるため、半角英数字を推奨します。
+          </p>
 
           <label for="personaCategoryDescription">説明</label>
           <textarea id="personaCategoryDescription" placeholder="例：ナガノAI関連の絵師ペルソナ"></textarea>
@@ -571,6 +574,9 @@
 
           <label for="categoryName">カテゴリ名</label>
           <input id="categoryName" placeholder="例：NaganoCo" />
+          <p class="hint">
+            Storageの保存先フォルダ名として自動入力される場合があるため、半角英数字を推奨します。
+          </p>
 
           <div class="actions">
             <button class="primary" id="saveCategoryBtn">保存</button>
@@ -717,10 +723,7 @@
     let storageImages = [];
 
     let selectedUploadFile = null;
-    let selectedUploadDataUrl = "";
-
     let selectedPersonaUploadFile = null;
-    let selectedPersonaUploadDataUrl = "";
 
     const loginSection = document.getElementById("loginSection");
     const adminMain = document.getElementById("adminMain");
@@ -807,6 +810,44 @@
     function getShortText(text, max = 120) {
       const value = String(text || "");
       return value.slice(0, max) + (value.length > max ? "..." : "");
+    }
+
+    function containsJapanese(text) {
+      return /[\u3040-\u30ff\u3400-\u9fff]/.test(String(text || ""));
+    }
+
+    function confirmJapaneseCategoryName(name, label) {
+      if (!containsJapanese(name)) {
+        return true;
+      }
+
+      return confirm(
+        `${label}に日本語が含まれています。\n\n` +
+        `このカテゴリ名はStorageの保存先フォルダ名として自動入力される場合があります。\n` +
+        `日本語を含むフォルダ名はStorage保存時にエラーになる可能性があります。\n\n` +
+        `推奨例：\n` +
+        `ChatGPT\n` +
+        `NaganoAI\n` +
+        `Gemini\n\n` +
+        `このまま保存しますか？`
+      );
+    }
+
+    function confirmJapaneseStorageFolderName(folderName, label) {
+      if (!containsJapanese(folderName)) {
+        return true;
+      }
+
+      return confirm(
+        `${label}に日本語が含まれています。\n\n` +
+        `日本語を含むStorage保存先フォルダは、保存時にエラーになる可能性があります。\n` +
+        `半角英数字のフォルダ名を推奨します。\n\n` +
+        `推奨例：\n` +
+        `ChatGPT\n` +
+        `NaganoAI\n` +
+        `Gemini\n\n` +
+        `このままアップロードしますか？`
+      );
     }
 
     function saveAdminSession(password) {
@@ -976,7 +1017,7 @@
 
         loginInfo.textContent = "保存済みセッションでログイン中です。";
         setStatus(globalStatus, "自動ログインしました。", "success");
-      } catch (error) {
+      } catch {
         adminPassword = "";
         clearAdminSession();
         setStatus(loginStatus, "保存済みセッションが無効です。再ログインしてください。", "warning");
@@ -1105,14 +1146,12 @@
 
     function clearUploadForm() {
       selectedUploadFile = null;
-      selectedUploadDataUrl = "";
       characterImageFile.value = "";
       renderUploadPreview("");
     }
 
     function clearPersonaUploadForm() {
       selectedPersonaUploadFile = null;
-      selectedPersonaUploadDataUrl = "";
       personaImageFile.value = "";
       renderPersonaUploadPreview("");
     }
@@ -1696,6 +1735,11 @@
         return;
       }
 
+      if (!confirmJapaneseCategoryName(payload.name, "絵師カテゴリ名")) {
+        setStatus(globalStatus, "絵師カテゴリの保存をキャンセルしました。", "warning");
+        return;
+      }
+
       try {
         const id = personaCategoryId.value;
 
@@ -1721,6 +1765,11 @@
 
       if (!payload.name) {
         setStatus(globalStatus, "カテゴリ名を入力してください。", "error");
+        return;
+      }
+
+      if (!confirmJapaneseCategoryName(payload.name, "キャラクターカテゴリ名")) {
+        setStatus(globalStatus, "キャラクターカテゴリの保存をキャンセルしました。", "warning");
         return;
       }
 
@@ -1754,6 +1803,11 @@
       }
 
       const folder = personaUploadFolder.value.trim() || "default";
+
+      if (!confirmJapaneseStorageFolderName(folder, "絵師胸像画像の保存先フォルダ")) {
+        throw new Error("胸像画像アップロードをキャンセルしました。");
+      }
+
       const base64 = await fileToBase64(selectedPersonaUploadFile);
 
       const result = await adminRequest({
@@ -1788,6 +1842,11 @@
       }
 
       const folder = uploadFolder.value.trim() || "default";
+
+      if (!confirmJapaneseStorageFolderName(folder, "キャラクター画像の保存先フォルダ")) {
+        throw new Error("キャラクター画像アップロードをキャンセルしました。");
+      }
+
       const base64 = await fileToBase64(selectedUploadFile);
 
       const result = await adminRequest({
@@ -2031,7 +2090,6 @@
 
       if (!file) {
         selectedPersonaUploadFile = null;
-        selectedPersonaUploadDataUrl = "";
         renderPersonaUploadPreview("");
         return;
       }
@@ -2039,12 +2097,11 @@
       selectedPersonaUploadFile = file;
 
       try {
-        selectedPersonaUploadDataUrl = await fileToDataUrl(file);
-        renderPersonaUploadPreview(selectedPersonaUploadDataUrl);
+        const dataUrl = await fileToDataUrl(file);
+        renderPersonaUploadPreview(dataUrl);
         setStatus(globalStatus, "胸像画像を選択しました。保存時にアップロードされます。", "success");
       } catch (error) {
         selectedPersonaUploadFile = null;
-        selectedPersonaUploadDataUrl = "";
         renderPersonaUploadPreview("");
         setStatus(globalStatus, error.message, "error");
       }
@@ -2055,7 +2112,6 @@
 
       if (!file) {
         selectedUploadFile = null;
-        selectedUploadDataUrl = "";
         renderUploadPreview("");
         return;
       }
@@ -2063,12 +2119,11 @@
       selectedUploadFile = file;
 
       try {
-        selectedUploadDataUrl = await fileToDataUrl(file);
-        renderUploadPreview(selectedUploadDataUrl);
+        const dataUrl = await fileToDataUrl(file);
+        renderUploadPreview(dataUrl);
         setStatus(globalStatus, "画像を選択しました。保存時にアップロードされます。", "success");
       } catch (error) {
         selectedUploadFile = null;
-        selectedUploadDataUrl = "";
         renderUploadPreview("");
         setStatus(globalStatus, error.message, "error");
       }
