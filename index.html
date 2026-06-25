@@ -158,6 +158,20 @@
       gap: 10px;
       align-items: center;
       min-height: 104px;
+      position: relative;
+    }
+
+    .character-button.active::after {
+      content: "選択中";
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      font-size: 10px;
+      font-weight: 800;
+      color: #020617;
+      background: var(--accent);
+      border-radius: 999px;
+      padding: 3px 7px;
     }
 
     .character-thumb {
@@ -283,7 +297,7 @@
   <header>
     <h1>Artist Prompt Studio</h1>
     <p>
-      Supabaseに登録した絵師ペルソナとキャラクターを読み込み、Private Storageの画像を一時URLで表示しながら、画像生成プロンプトを作成します。
+      Supabaseに登録した絵師ペルソナと複数キャラクターを読み込み、Private Storage画像を一時URLで表示しながら、画像生成プロンプトを作成します。
     </p>
   </header>
 
@@ -315,7 +329,7 @@
 
       <label>キャラクター</label>
       <div class="hint">
-        character_profiles から選択カテゴリのキャラクターを読み込み、Private Storage画像は署名付きURLで表示します。
+        character_profiles から選択カテゴリのキャラクターを読み込みます。クリックで複数選択・解除できます。
       </div>
       <div class="grid" id="characterGrid">
         <div class="empty-box">キャラクターを読み込み中です...</div>
@@ -324,13 +338,13 @@
       <label for="sceneText">作りたいシーン</label>
       <textarea
         id="sceneText"
-        placeholder="例：未来的な建設現場で高校生にAIと建設DXの魅力を説明している。アスペクト比16:9。"
+        placeholder="例：ナガノAIとナガノ玄が、未来的な建設現場で高校生に建設DXの魅力を説明している。周囲ではナガノAIエージェントたちがホログラム画面を操作してサポートしている。アスペクト比16:9。"
       ></textarea>
 
       <label for="extraText">追加条件</label>
       <textarea
         id="extraText"
-        placeholder="例：高校生向けプレゼン資料に使う。明るく、わかりやすく、文字は入れない。"
+        placeholder="例：プレゼン資料の表紙に使える明るいビジュアル。文字は入れない。AI感、建設現場のスケール感、親しみやすさを出す。"
       ></textarea>
 
       <div class="actions">
@@ -380,7 +394,7 @@
 
     let selectedPersona = null;
     let selectedCategoryId = "";
-    let selectedCharacter = null;
+    let selectedCharacters = [];
 
     const personaGrid = document.getElementById("personaGrid");
     const categorySelect = document.getElementById("categorySelect");
@@ -457,7 +471,7 @@
       if (!imagePath) return "";
 
       // 既存データ互換用。
-      // ただしPrivate運用では、image_urlにはURLではなくStorage内パスを入れるのがおすすめです。
+      // Private運用では、image_urlにはURLではなくStorage内パスを入れるのがおすすめです。
       if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
         return imagePath;
       }
@@ -578,7 +592,7 @@
       const data = await fetchSupabase(CHARACTER_PROFILES_TABLE, query);
 
       if (!Array.isArray(data) || data.length === 0) {
-        selectedCharacter = null;
+        selectedCharacters = [];
         characters = [];
         characterGrid.innerHTML = `
           <div class="empty-box">
@@ -600,7 +614,9 @@
         })
       );
 
-      selectedCharacter = characters[0];
+      // 初期状態では1体目を選択
+      selectedCharacters = [characters[0]];
+
       renderCharacters();
     }
 
@@ -612,7 +628,11 @@
         button.type = "button";
         button.className = "select-button character-button";
 
-        if (selectedCharacter && character.id === selectedCharacter.id) {
+        const isSelected = selectedCharacters.some(
+          selected => selected.id === character.id
+        );
+
+        if (isSelected) {
           button.classList.add("active");
         }
 
@@ -629,9 +649,27 @@
         `;
 
         button.addEventListener("click", () => {
-          selectedCharacter = character;
+          const alreadySelected = selectedCharacters.some(
+            selected => selected.id === character.id
+          );
+
+          if (alreadySelected) {
+            selectedCharacters = selectedCharacters.filter(
+              selected => selected.id !== character.id
+            );
+          } else {
+            selectedCharacters.push(character);
+          }
+
           renderCharacters();
-          setStatus(`キャラクター「${character.name}」を選択しました。`, "success");
+
+          const names = selectedCharacters.map(item => item.name).join("、");
+
+          if (selectedCharacters.length === 0) {
+            setStatus("キャラクターが未選択です。1体以上選択してください。", "warning");
+          } else {
+            setStatus(`選択中のキャラクター：${names}`, "success");
+          }
         });
 
         characterGrid.appendChild(button);
@@ -646,7 +684,8 @@
         await loadCategories();
         await loadCharacters();
 
-        setStatus("絵師・カテゴリ・キャラクターを読み込みました。", "success");
+        const selectedNames = selectedCharacters.map(item => item.name).join("、");
+        setStatus(`絵師・カテゴリ・キャラクターを読み込みました。選択中：${selectedNames}`, "success");
       } catch (error) {
         personaGrid.innerHTML = `
           <div class="empty-box">
@@ -678,8 +717,8 @@
         return;
       }
 
-      if (!selectedCharacter) {
-        setStatus("キャラクターが選択されていません。", "error");
+      if (!selectedCharacters || selectedCharacters.length === 0) {
+        setStatus("キャラクターが選択されていません。1体以上選択してください。", "error");
         return;
       }
 
@@ -688,14 +727,23 @@
         return;
       }
 
-      const characterPrompt = `
-選択キャラクター：${selectedCharacter.name}
+      const selectedCharacterText = selectedCharacters
+        .map((character, index) => {
+          return `
+${index + 1}. ${character.name}
 
 キャラクター基本設定：
-${selectedCharacter.base_prompt || "未設定"}
+${character.base_prompt || "未設定"}
 
 キャラクター画像パス：
-${selectedCharacter.image_url || "未設定"}
+${character.image_url || "未設定"}
+`;
+        })
+        .join("\n");
+
+      const characterPrompt = `
+選択キャラクター一覧：
+${selectedCharacterText}
 
 ユーザーが作りたいシーン：
 ${sceneText}
@@ -707,7 +755,9 @@ ${extraText || "なし"}
 - 画像生成AIにそのまま貼り付けやすい英語プロンプトを作成する
 - その下に、学習用として日本語プロンプトも作成する
 - 実際の画像生成時にはキャラクター設定画像を添付する前提なので、キャラクターの細かな容姿説明はしすぎない
-- キャラクター名を主語にする
+- 複数キャラクターが選択されている場合は、それぞれの役割、位置関係、表情、行動を明確にする
+- キャラクター名を主語として使う
+- キャラクター同士の関係性が伝わる構図にする
 - 画風、構図、背景、ライティング、雰囲気、用途を明確にする
 - 必要に応じて「16:9」などの構図指定も含める
 `;
@@ -774,7 +824,9 @@ ${extraText || "なし"}
 
       try {
         await loadCharacters();
-        setStatus("キャラクター一覧を更新しました。", "success");
+
+        const selectedNames = selectedCharacters.map(item => item.name).join("、");
+        setStatus(`キャラクター一覧を更新しました。選択中：${selectedNames}`, "success");
       } catch (error) {
         characterGrid.innerHTML = `
           <div class="empty-box">
