@@ -48,7 +48,7 @@
     header p {
       margin: 12px auto 0;
       color: var(--muted);
-      max-width: 860px;
+      max-width: 880px;
       line-height: 1.7;
     }
 
@@ -87,7 +87,8 @@
       backdrop-filter: blur(12px);
     }
 
-    h2, h3 {
+    h2,
+    h3 {
       margin-top: 0;
     }
 
@@ -234,6 +235,7 @@
       color: var(--muted);
       line-height: 1.6;
       font-size: 14px;
+      white-space: pre-wrap;
     }
 
     .status.success {
@@ -464,6 +466,7 @@
         <h2>絵師ペルソナ管理</h2>
         <p class="hint">
           index.htmlで選択できる絵師ペルソナを管理します。胸像画像を選択して保存すると、artist_persona_imagesへアップロードされます。
+          既存画像のまま絵師カテゴリを変更した場合は、Storage内の画像配置も新しいカテゴリフォルダへ同期できます。
         </p>
 
         <div class="form-grid">
@@ -493,7 +496,7 @@
             <div class="two-col">
               <div>
                 <label for="personaUploadFolder">保存先フォルダ</label>
-                <input id="personaUploadFolder" placeholder="例：NaganoAI" />
+                <input id="personaUploadFolder" placeholder="例：ChatGPT" />
               </div>
 
               <div>
@@ -506,14 +509,15 @@
               <div id="personaUploadPreviewBox" class="upload-preview persona empty">Preview</div>
               <div>
                 <p class="hint">
-                  新しい画像を選択した場合は、保存時にアップロードされます。画像を選択しない場合は、下の image_url の値をそのまま使います。
+                  新しい画像を選択した場合は、保存時にアップロードされます。
+                  画像を選択しない場合は、下の image_url の値を使用し、カテゴリ変更時にStorage画像配置を同期できます。
                 </p>
               </div>
             </div>
           </div>
 
           <label for="personaImageUrl">image_url / Storage内パス</label>
-          <input id="personaImageUrl" placeholder="例：NaganoAI/aoharu.png" />
+          <input id="personaImageUrl" placeholder="例：ChatGPT/aoharu.png" />
           <p class="hint">
             artist_persona_images バケット内のパスです。Private Storageのまま使用できます。
           </p>
@@ -542,13 +546,13 @@
           <input type="hidden" id="personaCategoryId" />
 
           <label for="personaCategoryName">絵師カテゴリ名</label>
-          <input id="personaCategoryName" placeholder="例：NaganoAI" />
+          <input id="personaCategoryName" placeholder="例：ChatGPT" />
           <p class="hint">
             Storageの保存先フォルダ名として自動入力される場合があるため、半角英数字を推奨します。
           </p>
 
           <label for="personaCategoryDescription">説明</label>
-          <textarea id="personaCategoryDescription" placeholder="例：ナガノAI関連の絵師ペルソナ"></textarea>
+          <textarea id="personaCategoryDescription" placeholder="例：ChatGPTで使用する絵師ペルソナ"></textarea>
 
           <div class="actions">
             <button class="primary" id="savePersonaCategoryBtn">保存</button>
@@ -557,7 +561,8 @@
         </div>
 
         <div class="warning-box">
-          使用中の絵師カテゴリを削除すると、DB側では絵師ペルソナの category_id が null になります。運用上は先に絵師ペルソナ側のカテゴリを変更するのがおすすめです。
+          使用中の絵師カテゴリを削除すると、DB側では絵師ペルソナの category_id が null になります。
+          画像配置まで移動したい場合は、削除ではなく絵師ペルソナ編集画面でカテゴリを変更して保存してください。
         </div>
 
         <div class="list" id="personaCategoryList"></div>
@@ -586,6 +591,7 @@
 
         <div class="warning-box">
           カテゴリを削除する場合は、先にそのカテゴリを使用しているキャラクターのカテゴリを変更するか、キャラクターを削除してください。
+          画像配置まで移動したい場合は、キャラクター編集画面でカテゴリを変更して保存してください。
         </div>
 
         <div class="list" id="categoryList"></div>
@@ -595,6 +601,7 @@
         <h2>キャラクター管理</h2>
         <p class="hint">
           画像ファイルを選択して保存すると、画像アップロードとキャラクターレコード保存をまとめて行います。
+          既存画像のままカテゴリを変更した場合は、Storage内の画像配置も新しいカテゴリフォルダへ同期できます。
         </p>
 
         <div class="form-grid">
@@ -637,7 +644,8 @@
               <div id="uploadPreviewBox" class="upload-preview empty">Preview</div>
               <div>
                 <p class="hint">
-                  新しい画像を選択した場合は、保存時にアップロードされます。画像を選択しない場合は、下の image_url の値をそのまま使います。
+                  新しい画像を選択した場合は、保存時にアップロードされます。
+                  画像を選択しない場合は、下の image_url の値を使用し、カテゴリ変更時にStorage画像配置を同期できます。
                 </p>
               </div>
             </div>
@@ -682,7 +690,7 @@
         </div>
 
         <label for="storageFolder">表示するフォルダ</label>
-        <input id="storageFolder" placeholder="例：NaganoCo / NaganoAI" />
+        <input id="storageFolder" placeholder="例：NaganoCo / ChatGPT" />
         <p class="hint">
           空欄の場合はバケット直下を表示します。カテゴリ名や所属AI名のフォルダを指定するのがおすすめです。
         </p>
@@ -846,7 +854,7 @@
         `ChatGPT\n` +
         `NaganoAI\n` +
         `Gemini\n\n` +
-        `このままアップロードしますか？`
+        `このまま続行しますか？`
       );
     }
 
@@ -1196,6 +1204,70 @@
 
     function getPersonasUsingImagePath(path) {
       return personas.filter((persona) => persona.image_url === path);
+    }
+
+    async function moveImageToCategoryFolderIfNeeded({
+      imageType,
+      currentImagePath,
+      targetFolder,
+      label,
+    }) {
+      const imagePath = String(currentImagePath || "").trim();
+      const folder = String(targetFolder || "").trim();
+
+      if (!imagePath) {
+        return "";
+      }
+
+      if (!folder) {
+        return imagePath;
+      }
+
+      if (imagePath.startsWith("http://") || imagePath.startsWith("https://")) {
+        return imagePath;
+      }
+
+      if (!imagePath.includes("/")) {
+        return imagePath;
+      }
+
+      const currentFolder = imagePath.split("/").slice(0, -1).join("/");
+
+      if (currentFolder === folder) {
+        return imagePath;
+      }
+
+      if (!confirmJapaneseStorageFolderName(folder, `${label}の移動先Storageフォルダ`)) {
+        throw new Error(`${label}のStorage画像移動をキャンセルしました。`);
+      }
+
+      const ok = confirm(
+        `カテゴリ変更に合わせて、Storage内の画像配置も更新しますか？\n\n` +
+        `対象：${label}\n\n` +
+        `現在の画像パス：\n${imagePath}\n\n` +
+        `移動先フォルダ：\n${folder}\n\n` +
+        `OK：画像を新しいカテゴリフォルダへ移動して image_url も更新\n` +
+        `キャンセル：画像は移動せず、現在の image_url のまま保存`
+      );
+
+      if (!ok) {
+        return imagePath;
+      }
+
+      const result = await adminRequest({
+        action: "move_image_to_folder",
+        payload: {
+          imageType,
+          path: imagePath,
+          targetFolder: folder,
+        },
+      });
+
+      if (!result.newPath) {
+        throw new Error("Storage画像移動後の新しいパスを取得できませんでした。");
+      }
+
+      return result.newPath;
     }
 
     async function renderPersonas() {
@@ -1694,7 +1766,20 @@
           setStatus(globalStatus, "絵師ペルソナを保存しています...", "");
         }
 
-        const finalImageUrl = await uploadSelectedPersonaImageIfNeeded();
+        let finalImageUrl = await uploadSelectedPersonaImageIfNeeded();
+
+        const targetFolder = getPersonaCategoryNameById(categoryIdValue) || "default";
+
+        if (!selectedPersonaUploadFile && finalImageUrl) {
+          finalImageUrl = await moveImageToCategoryFolderIfNeeded({
+            imageType: "persona",
+            currentImagePath: finalImageUrl,
+            targetFolder,
+            label: "絵師胸像画像",
+          });
+
+          personaImageUrl.value = finalImageUrl;
+        }
 
         const payload = {
           name,
@@ -1716,7 +1801,11 @@
         await loadAllData();
         clearPersonaForm();
 
-        setStatus(globalStatus, "絵師ペルソナを保存しました。胸像画像を選択していた場合はStorageにもアップロード済みです。", "success");
+        setStatus(
+          globalStatus,
+          "絵師ペルソナを保存しました。カテゴリ変更時はStorage画像配置も同期しました。",
+          "success"
+        );
       } catch (error) {
         setStatus(globalStatus, `保存エラー：${error.message}`, "error");
       } finally {
@@ -1888,7 +1977,20 @@
           setStatus(globalStatus, "キャラクターを保存しています...", "");
         }
 
-        const finalImageUrl = await uploadSelectedCharacterImageIfNeeded();
+        let finalImageUrl = await uploadSelectedCharacterImageIfNeeded();
+
+        const targetFolder = getCategoryNameById(categoryIdValue) || "default";
+
+        if (!selectedUploadFile && finalImageUrl) {
+          finalImageUrl = await moveImageToCategoryFolderIfNeeded({
+            imageType: "character",
+            currentImagePath: finalImageUrl,
+            targetFolder,
+            label: "キャラクター画像",
+          });
+
+          characterImageUrl.value = finalImageUrl;
+        }
 
         const payload = {
           name,
@@ -1909,7 +2011,11 @@
         await loadAllData();
         clearCharacterForm();
 
-        setStatus(globalStatus, "キャラクターを保存しました。画像を選択していた場合はStorageにもアップロード済みです。", "success");
+        setStatus(
+          globalStatus,
+          "キャラクターを保存しました。カテゴリ変更時はStorage画像配置も同期しました。",
+          "success"
+        );
       } catch (error) {
         setStatus(globalStatus, `保存エラー：${error.message}`, "error");
       } finally {
