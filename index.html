@@ -385,6 +385,41 @@
       min-height: 120px;
     }
 
+    .history-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .history-item {
+      border: 1px solid var(--border);
+      background: rgba(31, 41, 55, 0.72);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .history-item strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+    }
+
+    .history-meta {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-wrap;
+    }
+
+    .history-empty {
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      padding: 14px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
     .hidden {
       display: none;
     }
@@ -571,6 +606,21 @@
           <button class="secondary small" id="copyJapaneseBtn">日本語プロンプトをコピー</button>
         </div>
       </div>
+
+      <div class="section-block">
+        <h3>生成履歴</h3>
+        <p class="hint">
+          生成履歴はこのブラウザのlocalStorageに最大20件保存されます。
+          履歴ごとに、選択した絵師・キャラクター・カテゴリ・検索語・無し設定・共創パターン・入力文を含む設定込みJSONを出力できます。
+        </p>
+
+        <div class="actions">
+          <button class="secondary small" id="reloadHistoryBtn">履歴を再読み込み</button>
+          <button class="danger small" id="clearHistoryBtn">履歴を全削除</button>
+        </div>
+
+        <div id="historyList" class="history-list"></div>
+      </div>
     </section>
   </main>
 
@@ -584,6 +634,8 @@
     const IMAGE_SIGN_URL_FUNCTION =
       "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-character-image-url";
 
+    const HISTORY_STORAGE_KEY = "artist_prompt_generation_history_v1";
+    const MAX_HISTORY_ITEMS = 20;
     const MAX_PERSONA_SELECTION = 2;
 
     const NONE_OPTION_LABELS = {
@@ -649,6 +701,10 @@
     const copyEnglishBtn = document.getElementById("copyEnglishBtn");
     const copyJapaneseBtn = document.getElementById("copyJapaneseBtn");
 
+    const historyList = document.getElementById("historyList");
+    const reloadHistoryBtn = document.getElementById("reloadHistoryBtn");
+    const clearHistoryBtn = document.getElementById("clearHistoryBtn");
+
     function setStatus(message, type = "") {
       statusEl.textContent = message;
       statusEl.className = `status ${type}`;
@@ -683,6 +739,28 @@
     function getCategoryNameById(categoryId) {
       const category = categories.find((item) => item.id === categoryId);
       return category ? category.name : "";
+    }
+
+    function getPersonaCategoryById(categoryId) {
+      return personaCategories.find((item) => item.id === categoryId) || null;
+    }
+
+    function getCharacterCategoryById(categoryId) {
+      return categories.find((item) => item.id === categoryId) || null;
+    }
+
+    function getSelectedNoneOptions() {
+      return Array.from(document.querySelectorAll(".none-option:checked"))
+        .map((input) => input.value)
+        .filter(Boolean);
+    }
+
+    function setSelectedNoneOptions(values) {
+      const selectedValues = Array.isArray(values) ? values : [];
+
+      document.querySelectorAll(".none-option").forEach((input) => {
+        input.checked = selectedValues.includes(input.value);
+      });
     }
 
     async function getSignedImageUrl(imagePath, imageType = "character") {
@@ -761,6 +839,7 @@
 
         renderSelectedPersonaSummary();
         renderSelectedCharacterSummary();
+        renderHistory();
 
         setStatus("データを読み込みました。", "success");
       } catch (error) {
@@ -1217,9 +1296,7 @@ ${COLLAB_PATTERN_LABELS[pattern] || COLLAB_PATTERN_LABELS.auto}
     }
 
     function buildNoneOptionsBlock() {
-      const checkedValues = Array.from(document.querySelectorAll(".none-option:checked"))
-        .map((input) => input.value)
-        .filter(Boolean);
+      const checkedValues = getSelectedNoneOptions();
 
       if (checkedValues.length === 0) {
         return "";
@@ -1310,6 +1387,434 @@ ${buildNoneOptionsBlock()}
       };
     }
 
+    function getHistory() {
+      try {
+        const raw = localStorage.getItem(HISTORY_STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+
+        if (!Array.isArray(parsed)) {
+          return [];
+        }
+
+        return parsed;
+      } catch {
+        return [];
+      }
+    }
+
+    function setHistory(items) {
+      localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(items));
+    }
+
+    function createHistorySnapshot({ english, japanese }) {
+      return {
+        id: crypto.randomUUID(),
+        createdAt: new Date().toISOString(),
+
+        modelName: modelName.value,
+
+        sceneText: sceneText.value,
+        extraText: extraText.value,
+
+        personaCategoryId: personaCategorySelect.value,
+        personaSearch: personaSearch.value,
+        selectedPersonaIds: selectedPersonas.map((persona) => persona.id),
+        selectedPersonaNames: selectedPersonas.map((persona) => persona.name),
+
+        collabPattern: collabPattern.value,
+
+        characterCategoryId: categorySelect.value,
+        characterSearch: characterSearch.value,
+        selectedCharacterIds: selectedCharacters.map((character) => character.id),
+        selectedCharacterNames: selectedCharacters.map((character) => character.name),
+
+        noneOptions: getSelectedNoneOptions(),
+
+        englishPrompt: english,
+        japanesePrompt: japanese,
+      };
+    }
+
+    function saveHistory(snapshot) {
+      const current = getHistory();
+
+      const next = [
+        snapshot,
+        ...current.filter((item) => item.id !== snapshot.id),
+      ].slice(0, MAX_HISTORY_ITEMS);
+
+      setHistory(next);
+      renderHistory();
+    }
+
+    function formatHistoryDate(isoString) {
+      try {
+        const date = new Date(isoString);
+
+        return date.toLocaleString("ja-JP", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+      } catch {
+        return isoString || "";
+      }
+    }
+
+    function safeFileName(text) {
+      return String(text || "history")
+        .normalize("NFKC")
+        .replace(/[\\/:*?"<>|#%{}^~[\]`]/g, "-")
+        .replace(/\s+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "")
+        .slice(0, 80) || "history";
+    }
+
+    function buildHistoryExportPayload(item) {
+      const selectedPersonaIds = Array.isArray(item.selectedPersonaIds)
+        ? item.selectedPersonaIds
+        : [];
+
+      const selectedCharacterIds = Array.isArray(item.selectedCharacterIds)
+        ? item.selectedCharacterIds
+        : [];
+
+      const exportPersonas = selectedPersonaIds.map((idValue, index) => {
+        const persona = personas.find((item) => item.id === idValue);
+        const fallbackName = Array.isArray(item.selectedPersonaNames)
+          ? item.selectedPersonaNames[index]
+          : "";
+
+        if (!persona) {
+          return {
+            id: idValue,
+            name: fallbackName || "",
+            missingFromCurrentDatabase: true,
+          };
+        }
+
+        const category = getPersonaCategoryById(persona.category_id);
+
+        return {
+          id: persona.id,
+          name: persona.name || "",
+          categoryId: persona.category_id || null,
+          categoryName: category ? category.name : "",
+          imageUrl: persona.image_url || "",
+          isActive: Boolean(persona.is_active),
+          systemInstruction: persona.system_instruction || "",
+          missingFromCurrentDatabase: false,
+        };
+      });
+
+      const exportCharacters = selectedCharacterIds.map((idValue, index) => {
+        const character = characters.find((item) => item.id === idValue);
+        const fallbackName = Array.isArray(item.selectedCharacterNames)
+          ? item.selectedCharacterNames[index]
+          : "";
+
+        if (!character) {
+          return {
+            id: idValue,
+            name: fallbackName || "",
+            missingFromCurrentDatabase: true,
+          };
+        }
+
+        const category = getCharacterCategoryById(character.category_id);
+
+        return {
+          id: character.id,
+          name: character.name || "",
+          categoryId: character.category_id || null,
+          categoryName: category ? category.name : "",
+          imageUrl: character.image_url || "",
+          basePrompt: character.base_prompt || "",
+          missingFromCurrentDatabase: false,
+        };
+      });
+
+      const noneOptions = Array.isArray(item.noneOptions) ? item.noneOptions : [];
+
+      return {
+        schema: "artist_prompt_studio_history_settings_v1",
+        exportedAt: new Date().toISOString(),
+        sourceApp: {
+          name: "Artist Prompt Studio",
+          storageKey: HISTORY_STORAGE_KEY,
+        },
+        history: {
+          id: item.id,
+          createdAt: item.createdAt,
+        },
+        model: {
+          name: item.modelName || "",
+        },
+        inputs: {
+          sceneText: item.sceneText || "",
+          extraText: item.extraText || "",
+        },
+        uiState: {
+          personaCategoryId: item.personaCategoryId || "",
+          personaCategoryName: item.personaCategoryId
+            ? getPersonaCategoryNameById(item.personaCategoryId)
+            : "すべての絵師カテゴリ",
+          personaSearch: item.personaSearch || "",
+          characterCategoryId: item.characterCategoryId || "",
+          characterCategoryName: item.characterCategoryId
+            ? getCategoryNameById(item.characterCategoryId)
+            : "",
+          characterSearch: item.characterSearch || "",
+        },
+        selectedSettings: {
+          personas: exportPersonas,
+          characters: exportCharacters,
+          collabPattern: item.collabPattern || "auto",
+          collabPatternLabel:
+            COLLAB_PATTERN_LABELS[item.collabPattern] || COLLAB_PATTERN_LABELS.auto,
+          noneOptions: noneOptions.map((value) => {
+            return {
+              value,
+              label: NONE_OPTION_LABELS[value] || value,
+            };
+          }),
+        },
+        outputs: {
+          englishPrompt: item.englishPrompt || "",
+          japanesePrompt: item.japanesePrompt || "",
+        },
+        restoreHints: {
+          selectedPersonaIds,
+          selectedCharacterIds,
+          maxPersonaSelection: MAX_PERSONA_SELECTION,
+          note:
+            "このJSONは設定込みの履歴出力です。別ツールで利用する場合は selectedSettings と outputs を参照してください。",
+        },
+      };
+    }
+
+    function downloadJsonFile(fileName, data) {
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], {
+        type: "application/json;charset=utf-8",
+      });
+
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+
+      anchor.href = url;
+      anchor.download = fileName;
+
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+
+      URL.revokeObjectURL(url);
+    }
+
+    function exportHistorySettingsJson(id) {
+      const item = getHistory().find((historyItem) => historyItem.id === id);
+
+      if (!item) {
+        setStatus("出力対象の履歴が見つかりません。", "error");
+        return;
+      }
+
+      const payload = buildHistoryExportPayload(item);
+      const createdAt = String(item.createdAt || "")
+        .replace(/[-:]/g, "")
+        .replace(/\.\d+Z$/, "")
+        .replace("T", "-");
+
+      const title = safeFileName(item.sceneText || "artist-prompt-history");
+      const fileName = `artist-prompt-settings-${createdAt || "unknown"}-${title}.json`;
+
+      downloadJsonFile(fileName, payload);
+      setStatus("設定込みJSONを出力しました。", "success");
+    }
+
+    function renderHistory() {
+      const items = getHistory();
+      historyList.innerHTML = "";
+
+      if (items.length === 0) {
+        historyList.innerHTML = `
+          <div class="history-empty">
+            生成履歴はまだありません。プロンプト生成に成功すると、ここに保存されます。
+          </div>
+        `;
+        return;
+      }
+
+      items.forEach((item) => {
+        const div = document.createElement("div");
+        div.className = "history-item";
+
+        const title = item.sceneText
+          ? getShortText(item.sceneText, 54)
+          : "無題の生成履歴";
+
+        const personaNames = Array.isArray(item.selectedPersonaNames) && item.selectedPersonaNames.length > 0
+          ? item.selectedPersonaNames.join("、")
+          : "未選択";
+
+        const characterNames = Array.isArray(item.selectedCharacterNames) && item.selectedCharacterNames.length > 0
+          ? item.selectedCharacterNames.join("、")
+          : "未選択";
+
+        const noneOptionText = Array.isArray(item.noneOptions) && item.noneOptions.length > 0
+          ? item.noneOptions.map((value) => NONE_OPTION_LABELS[value] || value).join("、")
+          : "なし";
+
+        div.innerHTML = `
+          <strong>${escapeHtml(title)}</strong>
+          <div class="history-meta">
+日時：${escapeHtml(formatHistoryDate(item.createdAt))}
+モデル：${escapeHtml(item.modelName || "")}
+絵師：${escapeHtml(personaNames)}
+キャラクター：${escapeHtml(characterNames)}
+共創パターン：${escapeHtml(COLLAB_PATTERN_LABELS[item.collabPattern] || item.collabPattern || "auto")}
+無し設定：${escapeHtml(noneOptionText)}
+          </div>
+          <div class="actions">
+            <button class="secondary small" data-show="${escapeHtml(item.id)}">結果を表示</button>
+            <button class="primary small" data-restore="${escapeHtml(item.id)}">設定を復元</button>
+            <button class="secondary small" data-export-json="${escapeHtml(item.id)}">設定込みJSON出力</button>
+            <button class="danger small" data-delete="${escapeHtml(item.id)}">削除</button>
+          </div>
+        `;
+
+        div.querySelector("[data-show]").addEventListener("click", () => {
+          showHistoryResult(item.id);
+        });
+
+        div.querySelector("[data-restore]").addEventListener("click", async () => {
+          await restoreHistorySettings(item.id);
+        });
+
+        div.querySelector("[data-export-json]").addEventListener("click", () => {
+          exportHistorySettingsJson(item.id);
+        });
+
+        div.querySelector("[data-delete]").addEventListener("click", () => {
+          deleteHistoryItem(item.id);
+        });
+
+        historyList.appendChild(div);
+      });
+    }
+
+    function showHistoryResult(id) {
+      const item = getHistory().find((historyItem) => historyItem.id === id);
+
+      if (!item) {
+        setStatus("履歴が見つかりません。", "error");
+        return;
+      }
+
+      englishPrompt.textContent = item.englishPrompt || "";
+      japanesePrompt.textContent = item.japanesePrompt || "";
+
+      setStatus("履歴の生成結果を表示しました。", "success");
+    }
+
+    function deleteHistoryItem(id) {
+      const next = getHistory().filter((item) => item.id !== id);
+      setHistory(next);
+      renderHistory();
+      setStatus("履歴を削除しました。", "success");
+    }
+
+    function clearHistory() {
+      const ok = confirm("生成履歴をすべて削除しますか？");
+
+      if (!ok) return;
+
+      setHistory([]);
+      renderHistory();
+      setStatus("生成履歴をすべて削除しました。", "success");
+    }
+
+    async function restoreHistorySettings(id) {
+      const item = getHistory().find((historyItem) => historyItem.id === id);
+
+      if (!item) {
+        setStatus("履歴が見つかりません。", "error");
+        return;
+      }
+
+      modelName.value = item.modelName || modelName.value;
+
+      sceneText.value = item.sceneText || "";
+      extraText.value = item.extraText || "";
+
+      if (typeof item.personaCategoryId === "string") {
+        personaCategorySelect.value = item.personaCategoryId;
+      }
+
+      personaSearch.value = item.personaSearch || "";
+
+      const personaIds = Array.isArray(item.selectedPersonaIds)
+        ? item.selectedPersonaIds
+        : [];
+
+      selectedPersonas = personaIds
+        .map((idValue) => personas.find((persona) => persona.id === idValue))
+        .filter(Boolean);
+
+      if (selectedPersonas.length > MAX_PERSONA_SELECTION) {
+        selectedPersonas = selectedPersonas.slice(0, MAX_PERSONA_SELECTION);
+      }
+
+      collabPattern.value = item.collabPattern || "auto";
+
+      if (selectedPersonas.length < 2) {
+        collabPattern.value = "auto";
+        collabPattern.disabled = true;
+      } else {
+        collabPattern.disabled = false;
+      }
+
+      if (typeof item.characterCategoryId === "string") {
+        categorySelect.value = item.characterCategoryId;
+      }
+
+      characterSearch.value = item.characterSearch || "";
+
+      const characterIds = Array.isArray(item.selectedCharacterIds)
+        ? item.selectedCharacterIds
+        : [];
+
+      selectedCharacters = characterIds
+        .map((idValue) => characters.find((character) => character.id === idValue))
+        .filter(Boolean);
+
+      setSelectedNoneOptions(item.noneOptions || []);
+
+      englishPrompt.textContent = item.englishPrompt || "";
+      japanesePrompt.textContent = item.japanesePrompt || "";
+
+      await renderPersonas();
+      await renderCharacters();
+      renderSelectedPersonaSummary();
+      renderSelectedCharacterSummary();
+
+      const missingPersonaCount = personaIds.length - selectedPersonas.length;
+      const missingCharacterCount = characterIds.length - selectedCharacters.length;
+
+      if (missingPersonaCount > 0 || missingCharacterCount > 0) {
+        setStatus(
+          "履歴の設定を復元しました。ただし、削除済みの絵師またはキャラクターは復元できませんでした。",
+          "warning"
+        );
+      } else {
+        setStatus("履歴の設定を復元しました。", "success");
+      }
+    }
+
     async function generatePrompt() {
       const scene = sceneText.value.trim();
       const extra = extraText.value.trim();
@@ -1359,10 +1864,18 @@ ${buildCharacterPromptBlock()}
         const rawText = data.text || data.result || "";
         const split = splitGeneratedText(rawText);
 
-        englishPrompt.textContent = split.english || rawText;
-        japanesePrompt.textContent = split.japanese || "";
+        const english = split.english || rawText;
+        const japanese = split.japanese || "";
 
-        setStatus("プロンプトを生成しました。", "success");
+        englishPrompt.textContent = english;
+        japanesePrompt.textContent = japanese;
+
+        saveHistory(createHistorySnapshot({
+          english,
+          japanese,
+        }));
+
+        setStatus("プロンプトを生成しました。生成履歴にも保存しました。", "success");
       } catch (error) {
         setStatus(`生成エラー：${error.message}`, "error");
       } finally {
@@ -1425,6 +1938,13 @@ ${buildCharacterPromptBlock()}
     copyJapaneseBtn.addEventListener("click", () => {
       copyText(japanesePrompt.textContent, "日本語プロンプト");
     });
+
+    reloadHistoryBtn.addEventListener("click", () => {
+      renderHistory();
+      setStatus("生成履歴を再読み込みしました。", "success");
+    });
+
+    clearHistoryBtn.addEventListener("click", clearHistory);
 
     loadInitialData();
   </script>
