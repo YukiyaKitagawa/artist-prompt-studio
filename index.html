@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Artist Prompt Studio</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-light: #1f2937;
+      --text: #f9fafb;
+      --muted: #9ca3af;
+      --accent: #38bdf8;
+      --accent2: #a78bfa;
+      --border: #334155;
+      --success: #22c55e;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(56, 189, 248, 0.18), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(167, 139, 250, 0.18), transparent 32%),
+        var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 32px 20px 16px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: clamp(28px, 5vw, 44px);
+      letter-spacing: 0.04em;
+    }
+
+    header p {
+      margin: 12px auto 0;
+      color: var(--muted);
+      max-width: 760px;
+      line-height: 1.7;
+    }
+
+    main {
+      width: min(1100px, calc(100% - 32px));
+      margin: 24px auto 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .card {
+      background: rgba(17, 24, 39, 0.86);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 22px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(12px);
+    }
+
+    .card h2 {
+      margin: 0 0 18px;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    label {
+      display: block;
+      font-weight: 700;
+      margin: 18px 0 8px;
+      color: #e5e7eb;
+    }
+
+    select,
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel-light);
+      color: var(--text);
+      padding: 12px 14px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 130px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+
+    select:focus,
+    input:focus,
+    textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+      margin-top: 6px;
+    }
+
+    .persona-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .persona-button {
+      border: 1px solid var(--border);
+      background: var(--panel-light);
+      color: var(--text);
+      border-radius: 14px;
+      padding: 12px;
+      cursor: pointer;
+      text-align: left;
+      transition: 0.18s ease;
+    }
+
+    .persona-button strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .persona-button span {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .persona-button.active {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(167, 139, 250, 0.18));
+      box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 22px;
+      flex-wrap: wrap;
+    }
+
+    button.primary,
+    button.secondary {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 20px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 15px;
+      transition: 0.18s ease;
+    }
+
+    button.primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #020617;
+      flex: 1;
+    }
+
+    button.secondary {
+      background: #334155;
+      color: var(--text);
+    }
+
+    button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    button.primary:hover:not(:disabled),
+    button.secondary:hover:not(:disabled),
+    .persona-button:hover {
+      transform: translateY(-1px);
+    }
+
+    .status {
+      margin-top: 14px;
+      font-size: 14px;
+      min-height: 22px;
+      color: var(--muted);
+    }
+
+    .status.success {
+      color: var(--success);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .result-box {
+      min-height: 420px;
+      white-space: pre-wrap;
+      line-height: 1.8;
+      background: #020617;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      color: #e5e7eb;
+      overflow: auto;
+    }
+
+    .small-title {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    @media (max-width: 860px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+
+      .persona-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>Artist Prompt Studio</h1>
+    <p>
+      絵師ペルソナとGeminiモデルを選び、キャラクターとシーンに合わせた画像生成プロンプトを作成します。
+      まずは最小構成版です。
+    </p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>🎨 プロンプト生成設定</h2>
+
+      <label>Geminiモデル</label>
+      <select id="modelName">
+        <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash（標準）</option>
+        <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+        <option value="gemini-flash-latest">Gemini Flash Latest</option>
+      </select>
+      <div class="hint">標準は、動作確認済みの Gemini 2.5 Flash にしています。</div>
+
+      <label>絵師ペルソナ</label>
+      <div class="persona-grid" id="personaGrid"></div>
+
+      <label for="characterName">キャラクター名</label>
+      <input id="characterName" type="text" value="ナガノAI" placeholder="例：ナガノAI、ナガノ玄、ナガノAIエージェント" />
+
+      <label for="sceneText">作りたいシーン</label>
+      <textarea id="sceneText" placeholder="例：添付のナガノAIが、未来的な建設現場で高校生にAIと建設DXの魅力を説明している。アスペクト比16:9。"></textarea>
+
+      <label for="extraText">追加条件</label>
+      <textarea id="extraText" placeholder="例：高校生向けプレゼン資料に使う。明るく、わかりやすく、文字は入れない。"></textarea>
+
+      <div class="actions">
+        <button class="primary" id="generateBtn">プロンプト生成</button>
+        <button class="secondary" id="clearBtn">クリア</button>
+      </div>
+
+      <div id="status" class="status"></div>
+    </section>
+
+    <section class="card">
+      <h2>📝 生成結果</h2>
+      <div class="small-title">Geminiから返ってきたプロンプト</div>
+      <div id="result" class="result-box">ここに生成結果が表示されます。</div>
+
+      <div class="actions">
+        <button class="secondary" id="copyBtn">結果をコピー</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const FUNCTION_URL = "https://jkacguhaabaqtrjaahgl.supabase.co/functions/v1/artist-generate-prompt";
+
+    const personas = [
+      {
+        id: "aoharu",
+        name: "アオハル",
+        label: "現代アニメ・ライトノベル風",
+        description: "明るい表情、青春感、親しみやすさ",
+        systemInstruction:
+          "あなたは現代アニメ・ライトノベル風のイラストレーター『アオハル』です。高校生に親しみやすく、明るく、表情豊かで、キャラクターの魅力が伝わる画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
+      },
+      {
+        id: "neon",
+        name: "ネオン",
+        label: "サイバーパンク・SFコンセプト",
+        description: "近未来感、ホログラム、AI感",
+        systemInstruction:
+          "あなたはサイバーパンク・SFコンセプトアーティスト『ネオン』です。建設業とAI、DX、ホログラム、ネオンライト、未来的なUIを組み合わせ、かっこよく高密度な画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
+      },
+      {
+        id: "emogra",
+        name: "エモグラ",
+        label: "日常系・エモーショナル",
+        description: "夕暮れ、光、空気感、物語性",
+        systemInstruction:
+          "あなたは日常系・エモーショナルイラストレーター『エモグラ』です。働くことの尊さ、現場の温かさ、空や光の美しさ、進路に悩む高校生の心に響く情景を重視した画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
+      },
+      {
+        id: "street",
+        name: "ストリート",
+        label: "フラットデザイン・ストリートポップ",
+        description: "SNS映え、太い主線、ビビッド配色",
+        systemInstruction:
+          "あなたはフラットデザイン・ストリートポップ絵師『ストリート』です。太い主線、ビビッドな配色、ステッカー風、プレゼン資料やSNSで目を引くポップな構成を重視した画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
+      },
+      {
+        id: "polygon",
+        name: "ポリゴン",
+        label: "ハイエンド3D・ゲームグラフィック",
+        description: "高精細3D、質感、ゲーム的没入感",
+        systemInstruction:
+          "あなたはハイエンド3D・ゲームグラフィッククリエイター『ポリゴン』です。Unreal Engine風、リアルな質感、立体感、金属光沢、毛並み、被写界深度、ゲームパッケージのような迫力を重視した画像生成プロンプトを作成してください。OpenAIの画像生成に使いやすい自然文の英語プロンプトを中心に、必要に応じて日本語の意味も補足してください。"
+      }
+    ];
+
+    let selectedPersona = personas[0];
+
+    const personaGrid = document.getElementById("personaGrid");
+    const statusEl = document.getElementById("status");
+    const resultEl = document.getElementById("result");
+    const generateBtn = document.getElementById("generateBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const copyBtn = document.getElementById("copyBtn");
+
+    function renderPersonas() {
+      personaGrid.innerHTML = "";
+
+      personas.forEach((persona) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "persona-button";
+        if (persona.id === selectedPersona.id) {
+          button.classList.add("active");
+        }
+
+        button.innerHTML = `
+          <strong>${persona.name}</strong>
+          <span>${persona.label}<br>${persona.description}</span>
+        `;
+
+        button.addEventListener("click", () => {
+          selectedPersona = persona;
+          renderPersonas();
+        });
+
+        personaGrid.appendChild(button);
+      });
+    }
+
+    function setStatus(message, type = "") {
+      statusEl.textContent = message;
+      statusEl.className = `status ${type}`;
+    }
+
+    async function generatePrompt() {
+      const modelName = document.getElementById("modelName").value;
+      const characterName = document.getElementById("characterName").value.trim();
+      const sceneText = document.getElementById("sceneText").value.trim();
+      const extraText = document.getElementById("extraText").value.trim();
+
+      if (!characterName) {
+        setStatus("キャラクター名を入力してください。", "error");
+        return;
+      }
+
+      if (!sceneText) {
+        setStatus("作りたいシーンを入力してください。", "error");
+        return;
+      }
+
+      const characterPrompt = `
+選択キャラクター：${characterName}
+
+ユーザーが作りたいシーン：
+${sceneText}
+
+追加条件：
+${extraText || "なし"}
+
+出力条件：
+- 画像生成AIにそのまま貼り付けやすい英語プロンプトを作成する
+- その下に、学習用として日本語プロンプトも作成する
+- 実際の画像生成時にはキャラクター設定画像を添付する前提なので、キャラクターの細かな容姿説明はしすぎない
+- キャラクター名を主語にする
+- 画風、構図、背景、ライティング、雰囲気、用途を明確にする
+- 必要に応じて「16:9」などの構図指定も含める
+`;
+
+      generateBtn.disabled = true;
+      setStatus("プロンプトを生成しています。", "");
+      resultEl.textContent = "生成中です...";
+
+      try {
+        const response = await fetch(FUNCTION_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            systemInstruction: selectedPersona.systemInstruction,
+            characterPrompt,
+            modelName
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.error) {
+          throw new Error(data.error || "不明なエラーが発生しました。");
+        }
+
+        resultEl.textContent = data.result || "結果が空でした。";
+        setStatus("生成が完了しました。", "success");
+      } catch (error) {
+        resultEl.textContent = "エラーが発生しました。";
+        setStatus(`エラー：${error.message}`, "error");
+      } finally {
+        generateBtn.disabled = false;
+      }
+    }
+
+    async function copyResult() {
+      const text = resultEl.textContent;
+
+      if (!text || text === "ここに生成結果が表示されます。" || text === "生成中です...") {
+        setStatus("コピーできる生成結果がありません。", "error");
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus("生成結果をコピーしました。", "success");
+      } catch (error) {
+        setStatus("コピーに失敗しました。手動で選択してコピーしてください。", "error");
+      }
+    }
+
+    function clearForm() {
+      document.getElementById("characterName").value = "ナガノAI";
+      document.getElementById("sceneText").value = "";
+      document.getElementById("extraText").value = "";
+      resultEl.textContent = "ここに生成結果が表示されます。";
+      setStatus("", "");
+    }
+
+    generateBtn.addEventListener("click", generatePrompt);
+    copyBtn.addEventListener("click", copyResult);
+    clearBtn.addEventListener("click", clearForm);
+
+    renderPersonas();
+  </script>
+</body>
+</html>
