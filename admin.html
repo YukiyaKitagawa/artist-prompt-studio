@@ -339,6 +339,17 @@
       margin-top: 12px;
     }
 
+    .warning-box {
+      border: 1px solid rgba(245, 158, 11, 0.45);
+      background: rgba(245, 158, 11, 0.08);
+      border-radius: 14px;
+      padding: 12px;
+      margin-top: 10px;
+      color: #fcd34d;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
     .hidden {
       display: none;
     }
@@ -448,7 +459,7 @@
       <div id="categoriesPanel" class="hidden">
         <h2>キャラクターカテゴリ管理</h2>
         <p class="hint">
-          キャラクターを分類するカテゴリを管理します。
+          キャラクターを分類するカテゴリを管理します。使用中のカテゴリは安全のため削除できません。
         </p>
 
         <div class="form-grid">
@@ -461,6 +472,10 @@
             <button class="primary" id="saveCategoryBtn">保存</button>
             <button class="secondary" id="newCategoryBtn">新規入力</button>
           </div>
+        </div>
+
+        <div class="warning-box">
+          カテゴリを削除する場合は、先にそのカテゴリを使用しているキャラクターのカテゴリを変更するか、キャラクターを削除してください。
         </div>
 
         <div class="list" id="categoryList"></div>
@@ -907,6 +922,10 @@
       return category ? category.name : "";
     }
 
+    function getCharactersUsingCategoryId(targetCategoryId) {
+      return characters.filter((character) => character.category_id === targetCategoryId);
+    }
+
     function getCharactersUsingImagePath(path) {
       return characters.filter((character) => character.image_url === path);
     }
@@ -980,11 +999,18 @@
         const item = document.createElement("div");
         item.className = "item";
 
+        const usingCharacters = getCharactersUsingCategoryId(category.id);
+        const usageText =
+          usingCharacters.length > 0
+            ? `使用中：${usingCharacters.map((character) => character.name).join("、")}`
+            : "未使用";
+
         item.innerHTML = `
           <div class="item-header">
             <div>
               <strong>${escapeHtml(category.name)}</strong>
               <div class="meta">ID: ${escapeHtml(category.id)}</div>
+              <div class="meta">${escapeHtml(usageText)}</div>
             </div>
             <div class="actions">
               <button class="small" data-edit="${category.id}">編集</button>
@@ -1001,25 +1027,47 @@
         });
 
         item.querySelector("[data-delete]").addEventListener("click", async () => {
-          if (!confirm(`カテゴリ「${category.name}」を削除しますか？`)) return;
-
-          try {
-            await adminRequest({
-              action: "delete",
-              table: "categories",
-              id: category.id,
-            });
-
-            await loadAllData();
-            clearCategoryForm();
-            setStatus(globalStatus, "カテゴリを削除しました。", "success");
-          } catch (error) {
-            setStatus(globalStatus, `削除エラー：${error.message}`, "error");
-          }
+          await deleteCategorySafely(category);
         });
 
         categoryList.appendChild(item);
       });
+    }
+
+    async function deleteCategorySafely(category) {
+      const usingCharacters = getCharactersUsingCategoryId(category.id);
+
+      if (usingCharacters.length > 0) {
+        const names = usingCharacters.map((character) => character.name).join("、");
+
+        alert(
+          `カテゴリ「${category.name}」は現在使用中のため削除できません。\n\n使用中キャラクター：\n${names}\n\n先にキャラクター管理でカテゴリを変更するか、該当キャラクターを削除してください。`
+        );
+
+        setStatus(
+          globalStatus,
+          `カテゴリ「${category.name}」は使用中のため削除をブロックしました。`,
+          "warning"
+        );
+
+        return;
+      }
+
+      if (!confirm(`未使用カテゴリ「${category.name}」を削除しますか？`)) return;
+
+      try {
+        await adminRequest({
+          action: "delete",
+          table: "categories",
+          id: category.id,
+        });
+
+        await loadAllData();
+        clearCategoryForm();
+        setStatus(globalStatus, "カテゴリを削除しました。", "success");
+      } catch (error) {
+        setStatus(globalStatus, `削除エラー：${error.message}`, "error");
+      }
     }
 
     function renderCategoryOptions() {
