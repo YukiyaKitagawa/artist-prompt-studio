@@ -174,6 +174,13 @@
       margin-top: 18px;
     }
 
+    .item-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
     button {
       border: none;
       border-radius: 999px;
@@ -188,8 +195,9 @@
     }
 
     button:disabled {
-      opacity: 0.55;
+      opacity: 0.45;
       cursor: not-allowed;
+      transform: none;
     }
 
     .primary {
@@ -212,6 +220,12 @@
       font-size: 13px;
       background: #334155;
       color: var(--text);
+    }
+
+    .move {
+      background: rgba(56, 189, 248, 0.18);
+      color: #bae6fd;
+      border: 1px solid rgba(56, 189, 248, 0.25);
     }
 
     .status {
@@ -384,6 +398,10 @@
 
       .item-header {
         flex-direction: column;
+      }
+
+      .item-actions {
+        justify-content: flex-start;
       }
     }
   </style>
@@ -890,23 +908,6 @@
         return imagePath;
       }
 
-      if (imageType === "persona") {
-        try {
-          const result = await adminRequest({
-            action: "list_images",
-            payload: {
-              imageType: "persona",
-              folder: imagePath.split("/").slice(0, -1).join("/"),
-            },
-          });
-
-          const file = (result.files || []).find((item) => item.path === imagePath);
-          return file ? file.signedUrl : "";
-        } catch {
-          return "";
-        }
-      }
-
       try {
         const response = await fetch(SIGNED_IMAGE_URL_FUNCTION, {
           method: "POST",
@@ -914,6 +915,7 @@
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
+            imageType,
             path: imagePath,
           }),
         });
@@ -1004,7 +1006,7 @@
       characters = characterResult.data || [];
 
       renderPersonaCategoryOptions();
-      renderPersonas();
+      await renderPersonas();
       renderPersonaCategories();
       renderCategories();
       renderCategoryOptions();
@@ -1024,6 +1026,52 @@
       categoriesPanel.classList.toggle("hidden", tab !== "categories");
       charactersPanel.classList.toggle("hidden", tab !== "characters");
       storagePanel.classList.toggle("hidden", tab !== "storage");
+    }
+
+    function createReorderPayload(items, targetId, direction) {
+      const nextItems = [...items];
+      const index = nextItems.findIndex((item) => item.id === targetId);
+
+      if (index === -1) return null;
+
+      const nextIndex = direction === "up" ? index - 1 : index + 1;
+
+      if (nextIndex < 0 || nextIndex >= nextItems.length) {
+        return null;
+      }
+
+      const temp = nextItems[index];
+      nextItems[index] = nextItems[nextIndex];
+      nextItems[nextIndex] = temp;
+
+      return nextItems.map((item, itemIndex) => ({
+        id: item.id,
+        sort_order: (itemIndex + 1) * 10,
+      }));
+    }
+
+    async function reorderList(tableKey, items, targetId, direction, label) {
+      const reorderItems = createReorderPayload(items, targetId, direction);
+
+      if (!reorderItems) return;
+
+      try {
+        setStatus(globalStatus, `${label}の並び順を更新しています...`, "");
+
+        await adminRequest({
+          action: "reorder",
+          table: tableKey,
+          payload: {
+            items: reorderItems,
+          },
+        });
+
+        await loadAllData();
+
+        setStatus(globalStatus, `${label}の並び順を更新しました。`, "success");
+      } catch (error) {
+        setStatus(globalStatus, `並び替えエラー：${error.message}`, "error");
+      }
     }
 
     function clearPersonaForm() {
@@ -1119,7 +1167,7 @@
         return;
       }
 
-      for (const persona of personas) {
+      for (const [index, persona] of personas.entries()) {
         const item = document.createElement("div");
         item.className = "item";
 
@@ -1138,16 +1186,27 @@
                 <strong>${escapeHtml(persona.name)}</strong>
                 <div class="meta">カテゴリ：${escapeHtml(category ? category.name : "未設定")}</div>
                 <div class="meta">有効：${persona.is_active ? "はい" : "いいえ"}</div>
+                <div class="meta">並び順：${escapeHtml(persona.sort_order ?? "")}</div>
                 <div class="meta">画像パス：${escapeHtml(persona.image_url || "未設定")}</div>
                 <div class="meta">${escapeHtml(getShortText(persona.system_instruction, 180))}</div>
               </div>
             </div>
-            <div class="actions">
+            <div class="item-actions">
+              <button class="small move" data-up="${persona.id}" ${index === 0 ? "disabled" : ""}>上へ</button>
+              <button class="small move" data-down="${persona.id}" ${index === personas.length - 1 ? "disabled" : ""}>下へ</button>
               <button class="small" data-edit="${persona.id}">編集</button>
               <button class="danger small" data-delete="${persona.id}">削除</button>
             </div>
           </div>
         `;
+
+        item.querySelector("[data-up]").addEventListener("click", () => {
+          reorderList("personas", personas, persona.id, "up", "絵師ペルソナ");
+        });
+
+        item.querySelector("[data-down]").addEventListener("click", () => {
+          reorderList("personas", personas, persona.id, "down", "絵師ペルソナ");
+        });
 
         item.querySelector("[data-edit]").addEventListener("click", () => {
           personaId.value = persona.id;
@@ -1178,7 +1237,7 @@
         return;
       }
 
-      personaCategories.forEach((category) => {
+      personaCategories.forEach((category, index) => {
         const item = document.createElement("div");
         item.className = "item";
 
@@ -1193,15 +1252,26 @@
             <div>
               <strong>${escapeHtml(category.name)}</strong>
               <div class="meta">ID: ${escapeHtml(category.id)}</div>
+              <div class="meta">並び順：${escapeHtml(category.sort_order ?? "")}</div>
               <div class="meta">${escapeHtml(category.description || "")}</div>
               <div class="meta">${escapeHtml(usageText)}</div>
             </div>
-            <div class="actions">
+            <div class="item-actions">
+              <button class="small move" data-up="${category.id}" ${index === 0 ? "disabled" : ""}>上へ</button>
+              <button class="small move" data-down="${category.id}" ${index === personaCategories.length - 1 ? "disabled" : ""}>下へ</button>
               <button class="small" data-edit="${category.id}">編集</button>
               <button class="danger small" data-delete="${category.id}">削除</button>
             </div>
           </div>
         `;
+
+        item.querySelector("[data-up]").addEventListener("click", () => {
+          reorderList("persona_categories", personaCategories, category.id, "up", "絵師カテゴリ");
+        });
+
+        item.querySelector("[data-down]").addEventListener("click", () => {
+          reorderList("persona_categories", personaCategories, category.id, "down", "絵師カテゴリ");
+        });
 
         item.querySelector("[data-edit]").addEventListener("click", () => {
           personaCategoryId.value = category.id;
@@ -1227,7 +1297,7 @@
         return;
       }
 
-      categories.forEach((category) => {
+      categories.forEach((category, index) => {
         const item = document.createElement("div");
         item.className = "item";
 
@@ -1242,14 +1312,25 @@
             <div>
               <strong>${escapeHtml(category.name)}</strong>
               <div class="meta">ID: ${escapeHtml(category.id)}</div>
+              <div class="meta">並び順：${escapeHtml(category.sort_order ?? "")}</div>
               <div class="meta">${escapeHtml(usageText)}</div>
             </div>
-            <div class="actions">
+            <div class="item-actions">
+              <button class="small move" data-up="${category.id}" ${index === 0 ? "disabled" : ""}>上へ</button>
+              <button class="small move" data-down="${category.id}" ${index === categories.length - 1 ? "disabled" : ""}>下へ</button>
               <button class="small" data-edit="${category.id}">編集</button>
               <button class="danger small" data-delete="${category.id}">削除</button>
             </div>
           </div>
         `;
+
+        item.querySelector("[data-up]").addEventListener("click", () => {
+          reorderList("categories", categories, category.id, "up", "キャラクターカテゴリ");
+        });
+
+        item.querySelector("[data-down]").addEventListener("click", () => {
+          reorderList("categories", categories, category.id, "down", "キャラクターカテゴリ");
+        });
 
         item.querySelector("[data-edit]").addEventListener("click", () => {
           categoryId.value = category.id;
@@ -1274,7 +1355,7 @@
         return;
       }
 
-      for (const character of characters) {
+      for (const [index, character] of characters.entries()) {
         const item = document.createElement("div");
         item.className = "item";
 
@@ -1292,16 +1373,27 @@
               <div>
                 <strong>${escapeHtml(character.name)}</strong>
                 <div class="meta">カテゴリ：${escapeHtml(category ? category.name : "未設定")}</div>
+                <div class="meta">並び順：${escapeHtml(character.sort_order ?? "")}</div>
                 <div class="meta">画像パス：${escapeHtml(character.image_url || "未設定")}</div>
                 <div class="meta">${escapeHtml(getShortText(character.base_prompt, 180))}</div>
               </div>
             </div>
-            <div class="actions">
+            <div class="item-actions">
+              <button class="small move" data-up="${character.id}" ${index === 0 ? "disabled" : ""}>上へ</button>
+              <button class="small move" data-down="${character.id}" ${index === characters.length - 1 ? "disabled" : ""}>下へ</button>
               <button class="small" data-edit="${character.id}">編集</button>
               <button class="danger small" data-delete="${character.id}">削除</button>
             </div>
           </div>
         `;
+
+        item.querySelector("[data-up]").addEventListener("click", () => {
+          reorderList("characters", characters, character.id, "up", "キャラクター");
+        });
+
+        item.querySelector("[data-down]").addEventListener("click", () => {
+          reorderList("characters", characters, character.id, "down", "キャラクター");
+        });
 
         item.querySelector("[data-edit]").addEventListener("click", () => {
           characterId.value = character.id;
@@ -1833,7 +1925,7 @@
                 <div class="meta">作成日時：${escapeHtml(image.created_at || "不明")}</div>
               </div>
             </div>
-            <div class="actions">
+            <div class="item-actions">
               <button class="small" data-copy="${escapeHtml(image.path)}">パスをコピー</button>
               <button class="danger small" data-delete="${escapeHtml(image.path)}">画像削除</button>
             </div>
