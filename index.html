@@ -88,7 +88,8 @@
       backdrop-filter: blur(12px);
     }
 
-    h2, h3 {
+    h2,
+    h3 {
       margin-top: 0;
     }
 
@@ -546,27 +547,27 @@
         <div class="option-grid">
           <label class="check-card">
             <input type="checkbox" class="none-option" value="no_text" />
-            <span>不要な背景文字なし / no unnecessary background text</span>
+            <span>文字はキャラ固有マーキングのみ許可</span>
           </label>
 
           <label class="check-card">
             <input type="checkbox" class="none-option" value="no_captions" />
-            <span>キャプションなし / no captions</span>
+            <span>キャプション・字幕・吹き出しなし</span>
           </label>
 
           <label class="check-card">
             <input type="checkbox" class="none-option" value="no_logos" />
-            <span>無関係なロゴなし / no unrelated logos</span>
+            <span>キャラ固有ロゴ以外を追加しない</span>
           </label>
 
           <label class="check-card">
             <input type="checkbox" class="none-option" value="no_readable_letters" />
-            <span>キャラ設定以外の読める文字なし</span>
+            <span>読める文字はキャラ設定マーキングのみ許可</span>
           </label>
 
           <label class="check-card">
             <input type="checkbox" class="none-option" value="no_text_except_title" />
-            <span>タイトルとキャラ設定以外の文字なし</span>
+            <span>タイトルとキャラ設定マーキングのみ許可</span>
           </label>
         </div>
       </div>
@@ -578,7 +579,7 @@
         <textarea id="sceneText" placeholder="例：ナガノAIとナガノ玄が、未来的なオフィスでプレゼン資料を作成している。アスペクト比16:9。"></textarea>
 
         <label for="extraText">追加条件</label>
-        <textarea id="extraText" placeholder="例：ネオンブルー、ピンク、紫の発光表現。タイトル以外の文字表記なし。"></textarea>
+        <textarea id="extraText" placeholder="例：ネオンブルー、ピンク、紫の発光表現。キャラクター固有マーキング以外の背景文字なし。"></textarea>
 
         <div class="actions">
           <button class="primary" id="generateBtn">プロンプト生成</button>
@@ -641,15 +642,15 @@
 
     const NONE_OPTION_LABELS = {
       no_text:
-        "no unnecessary background text / 不要な背景文字なし",
+        "Only character-specific design markings may contain readable text; keep the background, environment, props, machines, signs, and scenery free of extra readable text / 文字はキャラクター固有マーキングのみ許可し、背景・環境・小物・機械・看板・風景には余計な読める文字を追加しない",
       no_captions:
-        "no captions / キャプションなし",
+        "No captions, subtitles, speech bubbles, explanatory labels, UI-like text, or annotation text / キャプション、字幕、吹き出し、説明ラベル、UI風文字、注釈文字は入れない",
       no_logos:
-        "no unrelated logos / 無関係なロゴなし",
+        "Only selected character-specific logos and markings are allowed; do not add unrelated logos, brand marks, watermarks, or random emblems / 選択キャラクター固有のロゴ・マーキングのみ許可し、無関係なロゴ、ブランドマーク、透かし、ランダムなエンブレムは追加しない",
       no_readable_letters:
-        "no readable text except character design markings / キャラ設定以外の読める文字なし",
+        "Readable text is allowed only when it belongs to the selected character design markings; do not add any other readable text / 読める文字は選択キャラクターのデザインマーキングに属するものだけ許可し、それ以外は追加しない",
       no_text_except_title:
-        "only the specified title text and character design markings are allowed; no other text / タイトルとキャラ設定以外の文字なし",
+        "Only the specified title text and selected character design markings are allowed; no other readable text / 指定タイトルと選択キャラクターのデザインマーキングのみ許可し、それ以外の読める文字は追加しない",
     };
 
     const COLLAB_PATTERN_LABELS = {
@@ -1317,17 +1318,21 @@ ${COLLAB_PATTERN_LABELS[pattern] || COLLAB_PATTERN_LABELS.auto}
 文字・ロゴ制御：
 ${lines.join("\n")}
 
-キャラクター優先の文字ルール：
-- 選択キャラクター設定に含まれるロゴ、社名、ヘルメット文字、服の文字、ワッペン、安全標語、ラベル、装備上の表記は、キャラクター固有のデザイン要素として必ず保持してください。
-- 「不要な背景文字なし」「無関係なロゴなし」「キャプションなし」「キャラ設定以外の読める文字なし」が選択されている場合でも、その制限は不要な背景文字、字幕、説明文、透かし、署名、無関係なロゴ、ランダムな文字、看板の余計な文字にのみ適用してください。
+許可リスト方式の文字ルール：
+- 読める文字を完全禁止とは解釈しないでください。
+- 許可される読める文字は、選択キャラクター設定に含まれるキャラクター固有マーキングのみです。
+- 例：服のロゴ、会社名、ヘルメット文字、ワッペン、安全標語、装備上のラベル、キャラクター識別に必要なマーキング。
+- 背景、看板、壁、機械、空、床、UI、字幕、説明文、透かし、署名、ランダム文字、無関係なロゴには読める文字を追加しないでください。
 - ユーザーが明示的に削除を指示しない限り、キャラクター固有のロゴや文字は削除・置換しないでください。
-- 確認質問は行わず、キャラクター設定の文字・ロゴを優先してください。
+- 確認質問は行わず、この許可リストに従ってそのまま画像生成用プロンプトを完成させてください。
 
-Character-priority text rule:
-- Logos, company names, helmet text, jacket text, badges, safety slogans, labels, and readable markings that are part of the selected character design must be preserved as character identity details.
-- When no unnecessary background text, no unrelated logos, no captions, or no readable text except character markings is selected, those restrictions apply only to unnecessary background text, captions, random signs, watermarks, signatures, unrelated logos, and extra readable text.
-- Do not remove or replace character-specific logos or markings unless the user explicitly says to remove them.
-- Do not ask for clarification. Character design markings take priority.
+Allowed-text whitelist rule:
+- Do not interpret this as a total ban on readable text.
+- The only readable text allowed is character-specific design markings from the selected character references.
+- Examples include jacket logos, company names, helmet text, badges, safety slogans, equipment labels, and identity markings that belong to the characters.
+- Do not add readable text to the background, signs, walls, machines, sky, floor, UI panels, captions, subtitles, explanatory labels, watermarks, signatures, random lettering, or unrelated logos.
+- Do not remove or replace character-specific logos or markings unless the user explicitly asks to remove them.
+- Do not ask for clarification. Follow this whitelist rule and complete the image prompt.
 `.trim();
     }
 
@@ -1389,8 +1394,10 @@ ${persona.system_instruction || ""}
 - キャラクター名は、登録されている名称を尊重してください。
 - キャラクターのbase_promptがある場合は、外見・服装・役割・世界観を優先して反映してください。
 - キャラクター設定に含まれるロゴ、社名、ヘルメット文字、服の文字、ワッペン、安全標語、装備上の表記は、キャラクター固有のデザイン要素として優先してください。
-- 文字制御オプションが指定されている場合でも、キャラクター固有の文字・ロゴは削除対象ではありません。
-- 文字制御オプションは、背景の余計な文字、字幕、透かし、署名、無関係なロゴ、ランダム文字を抑制するためのものです。
+- 文字・ロゴ制御は、読める文字やロゴの完全禁止ではありません。
+- 文字・ロゴ制御が指定されている場合、許可される読める文字・ロゴはキャラクター固有マーキングのみです。
+- それ以外の背景文字、看板文字、字幕、説明文、透かし、署名、ランダム文字、無関係なロゴは追加しないでください。
+- 判断に迷う場合は確認質問をせず、キャラクター固有マーキングだけを許可してください。
 - 絵師ペルソナの胸像画像は、画面上で選択補助として使うための参考情報です。画像そのものを直接読んだ前提で断定しないでください。
 - 絵師ペルソナの画風は system_instruction を最優先で反映してください。
 - 矛盾がある場合は確認質問をせず、キャラクター固有デザインを優先してプロンプトを完成させてください。
@@ -1612,7 +1619,7 @@ ${buildNoneOptionsBlock()}
             };
           }),
           characterTextPriorityRule:
-            "Text/logo controls apply only to unnecessary background text, captions, watermarks, signatures, random signs, unrelated logos, and extra readable text. Character-specific logos and markings must be preserved.",
+            "Text/logo controls use an allowed-text whitelist. Readable text and logos are allowed only for selected character-specific design markings. Do not add background text, captions, watermarks, random lettering, unrelated logos, signs, or extra readable text.",
         },
         outputs: {
           englishPrompt: item.englishPrompt || "",
