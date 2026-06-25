@@ -93,6 +93,10 @@
       outline: none;
     }
 
+    input[type="file"] {
+      padding: 10px;
+    }
+
     textarea {
       min-height: 140px;
       resize: vertical;
@@ -252,6 +256,40 @@
       object-fit: cover;
       border: 1px solid var(--border);
       background: #020617;
+      flex: 0 0 auto;
+    }
+
+    .image-upload-box {
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(31, 41, 55, 0.45);
+    }
+
+    .upload-preview-wrap {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .upload-preview {
+      width: 96px;
+      height: 96px;
+      border-radius: 14px;
+      object-fit: cover;
+      border: 1px solid var(--border);
+      background: #020617;
+    }
+
+    .upload-preview.empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding: 8px;
     }
 
     .hidden {
@@ -271,6 +309,10 @@
       .two-col {
         grid-template-columns: 1fr;
       }
+
+      .item-header {
+        flex-direction: column;
+      }
     }
   </style>
 </head>
@@ -280,7 +322,7 @@
     <h1>Artist Prompt Studio Admin</h1>
     <p>
       絵師ペルソナ、キャラクターカテゴリ、キャラクター設定を管理します。
-      service_role key はEdge Function側だけで使用します。
+      Private Storageへの画像アップロードにも対応しています。
     </p>
   </header>
 
@@ -393,10 +435,41 @@
           <label for="characterBasePrompt">base_prompt</label>
           <textarea id="characterBasePrompt" placeholder="キャラクター設定、外見、性格、役割など"></textarea>
 
+          <div class="image-upload-box">
+            <h3>画像アップロード</h3>
+            <p class="hint">
+              PNG / JPEG / WebP に対応しています。アップロード後、Storage内パスが image_url に自動入力されます。
+            </p>
+
+            <div class="two-col">
+              <div>
+                <label for="uploadFolder">保存先フォルダ</label>
+                <input id="uploadFolder" placeholder="例：NaganoCo" />
+              </div>
+
+              <div>
+                <label for="characterImageFile">画像ファイル</label>
+                <input id="characterImageFile" type="file" accept="image/png,image/jpeg,image/webp" />
+              </div>
+            </div>
+
+            <div class="upload-preview-wrap">
+              <div id="uploadPreviewBox" class="upload-preview empty">Preview</div>
+              <div>
+                <div class="actions" style="margin-top:0;">
+                  <button class="secondary" id="uploadImageBtn">画像をアップロード</button>
+                </div>
+                <p class="hint">
+                  先に画像をアップロードしてから、キャラクター保存を押してください。
+                </p>
+              </div>
+            </div>
+          </div>
+
           <label for="characterImageUrl">image_url / Storage内パス</label>
           <input id="characterImageUrl" placeholder="例：NaganoCo/nagano-ai.png" />
           <p class="hint">
-            character_images バケット内のパスを入力します。画像アップロードは次フェーズで追加します。
+            character_images バケット内のパスです。Private Storageのまま使用できます。
           </p>
 
           <div class="actions">
@@ -423,6 +496,9 @@
     let personas = [];
     let categories = [];
     let characters = [];
+
+    let selectedUploadFile = null;
+    let selectedUploadDataUrl = "";
 
     const loginSection = document.getElementById("loginSection");
     const adminMain = document.getElementById("adminMain");
@@ -457,6 +533,11 @@
     const characterBasePrompt = document.getElementById("characterBasePrompt");
     const characterImageUrl = document.getElementById("characterImageUrl");
 
+    const uploadFolder = document.getElementById("uploadFolder");
+    const characterImageFile = document.getElementById("characterImageFile");
+    const uploadImageBtn = document.getElementById("uploadImageBtn");
+    const uploadPreviewBox = document.getElementById("uploadPreviewBox");
+
     const savePersonaBtn = document.getElementById("savePersonaBtn");
     const newPersonaBtn = document.getElementById("newPersonaBtn");
 
@@ -485,7 +566,52 @@
       return value.slice(0, max) + (value.length > max ? "..." : "");
     }
 
-    async function adminRequest({ action, table, id = null, payload = null }) {
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => {
+          const result = String(reader.result || "");
+          const base64 = result.includes(",") ? result.split(",")[1] : "";
+          resolve(base64);
+        };
+
+        reader.onerror = () => {
+          reject(new Error("ファイルの読み込みに失敗しました。"));
+        };
+
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function fileToDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+
+        reader.onload = () => {
+          resolve(String(reader.result || ""));
+        };
+
+        reader.onerror = () => {
+          reject(new Error("プレビューの読み込みに失敗しました。"));
+        };
+
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderUploadPreview(dataUrl) {
+      if (!dataUrl) {
+        uploadPreviewBox.className = "upload-preview empty";
+        uploadPreviewBox.innerHTML = "Preview";
+        return;
+      }
+
+      uploadPreviewBox.className = "upload-preview";
+      uploadPreviewBox.innerHTML = `<img class="upload-preview" src="${escapeHtml(dataUrl)}" alt="upload preview">`;
+    }
+
+    async function adminRequest({ action, table = null, id = null, payload = null }) {
       const response = await fetch(ADMIN_API_URL, {
         method: "POST",
         headers: {
@@ -612,6 +738,13 @@
       categoryName.value = "";
     }
 
+    function clearUploadForm() {
+      selectedUploadFile = null;
+      selectedUploadDataUrl = "";
+      characterImageFile.value = "";
+      renderUploadPreview("");
+    }
+
     function clearCharacterForm() {
       characterId.value = "";
       characterName.value = "";
@@ -620,7 +753,17 @@
 
       if (categories.length > 0) {
         characterCategory.value = categories[0].id;
+        uploadFolder.value = getCategoryNameById(categories[0].id) || "";
+      } else {
+        uploadFolder.value = "";
       }
+
+      clearUploadForm();
+    }
+
+    function getCategoryNameById(categoryId) {
+      const category = categories.find((item) => item.id === categoryId);
+      return category ? category.name : "";
     }
 
     function renderPersonas() {
@@ -742,6 +885,7 @@
         option.value = "";
         option.textContent = "カテゴリなし";
         characterCategory.appendChild(option);
+        uploadFolder.value = "";
         return;
       }
 
@@ -751,6 +895,10 @@
         option.textContent = category.name;
         characterCategory.appendChild(option);
       });
+
+      if (!uploadFolder.value && characterCategory.value) {
+        uploadFolder.value = getCategoryNameById(characterCategory.value);
+      }
     }
 
     async function renderCharacters() {
@@ -796,6 +944,8 @@
           characterBasePrompt.value = character.base_prompt || "";
           characterImageUrl.value = character.image_url || "";
           characterCategory.value = character.category_id || "";
+          uploadFolder.value = getCategoryNameById(character.category_id) || "";
+          clearUploadForm();
           switchTab("characters");
           setStatus(globalStatus, "キャラクターを編集モードにしました。", "success");
         });
@@ -911,6 +1061,51 @@
       }
     }
 
+    async function uploadCharacterImage() {
+      if (!selectedUploadFile) {
+        setStatus(globalStatus, "アップロードする画像を選択してください。", "error");
+        return;
+      }
+
+      const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
+
+      if (!allowedTypes.includes(selectedUploadFile.type)) {
+        setStatus(globalStatus, "PNG / JPEG / WebP の画像を選択してください。", "error");
+        return;
+      }
+
+      const folder = uploadFolder.value.trim() || "default";
+
+      uploadImageBtn.disabled = true;
+      setStatus(globalStatus, "画像をアップロードしています...", "");
+
+      try {
+        const base64 = await fileToBase64(selectedUploadFile);
+
+        const result = await adminRequest({
+          action: "upload_image",
+          payload: {
+            fileName: selectedUploadFile.name,
+            contentType: selectedUploadFile.type,
+            base64,
+            folder,
+          },
+        });
+
+        characterImageUrl.value = result.path || "";
+
+        setStatus(
+          globalStatus,
+          `画像をアップロードしました。Storage内パスを image_url に入力しました：${result.path}`,
+          "success"
+        );
+      } catch (error) {
+        setStatus(globalStatus, `画像アップロードエラー：${error.message}`, "error");
+      } finally {
+        uploadImageBtn.disabled = false;
+      }
+    }
+
     document.querySelectorAll(".tab-button").forEach((button) => {
       button.addEventListener("click", () => {
         switchTab(button.dataset.tab);
@@ -944,6 +1139,39 @@
 
     saveCharacterBtn.addEventListener("click", saveCharacter);
     newCharacterBtn.addEventListener("click", clearCharacterForm);
+
+    uploadImageBtn.addEventListener("click", uploadCharacterImage);
+
+    characterImageFile.addEventListener("change", async () => {
+      const file = characterImageFile.files && characterImageFile.files[0];
+
+      if (!file) {
+        selectedUploadFile = null;
+        selectedUploadDataUrl = "";
+        renderUploadPreview("");
+        return;
+      }
+
+      selectedUploadFile = file;
+
+      try {
+        selectedUploadDataUrl = await fileToDataUrl(file);
+        renderUploadPreview(selectedUploadDataUrl);
+      } catch (error) {
+        selectedUploadFile = null;
+        selectedUploadDataUrl = "";
+        renderUploadPreview("");
+        setStatus(globalStatus, error.message, "error");
+      }
+    });
+
+    characterCategory.addEventListener("change", () => {
+      const categoryName = getCategoryNameById(characterCategory.value);
+
+      if (categoryName) {
+        uploadFolder.value = categoryName;
+      }
+    });
   </script>
 </body>
 </html>
