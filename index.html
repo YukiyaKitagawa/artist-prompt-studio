@@ -630,13 +630,25 @@
           検索語を入力すると、現在のカテゴリ内で絞り込みます。
         </p>
 
-        <div class="actions">
-          <button class="secondary small" id="clearCharactersBtn">選択中キャラクターを全解除</button>
+        <div class="persona-toolbar">
+          <label class="check-card" style="margin:0;">
+            <input id="hideSelectedCharacters" type="checkbox" checked />
+            <span>選択済みのキャラクターを検索結果から隠す</span>
+          </label>
         </div>
 
-        <div class="selected-summary" id="selectedCharacterSummary"></div>
+        <div class="section-block" style="margin-top:16px; padding-top:14px;">
+          <h3 style="margin-bottom:8px;">選択中のキャラクター</h3>
+          <div class="selected-summary" id="selectedCharacterSummary"></div>
+          <div class="actions" style="margin-top:10px;">
+            <button class="secondary small" id="clearCharactersBtn">選択中キャラクターを全解除</button>
+          </div>
+        </div>
 
-        <div id="characterGrid" class="grid" style="margin-top: 14px;"></div>
+        <div id="characterGrid" class="persona-compact-list"></div>
+        <div id="characterLoadMoreWrap" class="persona-load-more-wrap hidden">
+          <button class="secondary small" id="characterLoadMoreBtn" type="button">さらに表示</button>
+        </div>
       </div>
 
       <div class="section-block">
@@ -746,10 +758,26 @@
     const MAX_HISTORY_ITEMS = 20;
     const MAX_PERSONA_SELECTION = 2;
     const PERSONA_PAGE_SIZE = 10;
+    const CHARACTER_PAGE_SIZE = 10;
     const COOLDOWN_KEY = "artist_prompt_generation_cooldown_until_v1";
     const DEFAULT_COOLDOWN_SECONDS = 60;
 
-    const STYLE_EXPLORE_REQUEST_TEMPLATE = `以下の画像生成AI用長文プロンプトを、固有名詞を除いた別の画像生成サービス向けの画風探索プロンプトに整理してください。
+    function buildStyleExploreRequestTemplate() {
+      const sourcePromptParts = [];
+
+      if (sceneText.value.trim()) {
+        sourcePromptParts.push(`作りたい画像の内容：\n${sceneText.value.trim()}`);
+      }
+
+      if (extraText.value.trim()) {
+        sourcePromptParts.push(`追加条件：\n${extraText.value.trim()}`);
+      }
+
+      const sourcePrompt = sourcePromptParts.length > 0
+        ? sourcePromptParts.join("\n\n")
+        : "ここに画像生成用の長文プロンプトを貼り付け";
+
+      return `以下の画像生成AI用長文プロンプトを、固有名詞を除いた別の画像生成サービス向けの画風探索プロンプトに整理してください。
 目的は、特定の絵師・キャラクター名・会社名・作品名・作家名に依存せず、画風・質感・光・色・構図の候補を比較生成することです。
 
 3案ください。
@@ -764,7 +792,8 @@
 ・必要に応じて、アスペクト比やスタイル強度などの汎用パラメータ候補も添える
 
 元の長文プロンプト：
-ここに貼り付け`.trim();
+${sourcePrompt}`.trim();
+    }
 
     const NONE_OPTION_LABELS = {
       no_text:
@@ -800,7 +829,9 @@
     let selectedCharacters = [];
 
     let expandedPersonaIds = new Set();
+    let expandedCharacterIds = new Set();
     let personaVisibleCount = PERSONA_PAGE_SIZE;
+    let characterVisibleCount = CHARACTER_PAGE_SIZE;
 
     let isGenerating = false;
     let cooldownUntil = Number(localStorage.getItem(COOLDOWN_KEY) || 0);
@@ -830,6 +861,9 @@
     const clearCharacterSearchBtn = document.getElementById("clearCharacterSearchBtn");
     const characterSearchInfo = document.getElementById("characterSearchInfo");
     const characterGrid = document.getElementById("characterGrid");
+    const characterLoadMoreWrap = document.getElementById("characterLoadMoreWrap");
+    const characterLoadMoreBtn = document.getElementById("characterLoadMoreBtn");
+    const hideSelectedCharacters = document.getElementById("hideSelectedCharacters");
     const selectedCharacterSummary = document.getElementById("selectedCharacterSummary");
     const clearCharactersBtn = document.getElementById("clearCharactersBtn");
 
@@ -1332,7 +1366,7 @@ ${characterPrompt}
         row.innerHTML = `
           <div>
             <div class="persona-compact-title">${escapeHtml(persona.name)}${isSelected ? "（選択中）" : ""}</div>
-            <div class="persona-compact-meta">カテゴリ：${escapeHtml(categoryName)} / ${escapeHtml(getShortText(persona.system_instruction, 90))}</div>
+            <div class="persona-compact-meta">カテゴリ：${escapeHtml(categoryName)}</div>
           </div>
           <div class="persona-compact-actions">
             <button class="${isSelected ? "secondary" : "primary"} small" type="button" data-action="select">${isSelected ? "解除" : "選択"}</button>
@@ -1483,7 +1517,7 @@ ${characterPrompt}
         option.value = "";
         option.textContent = "カテゴリなし";
         categorySelect.appendChild(option);
-        updateCharacterSearchInfo(0, 0);
+        updateCharacterSearchInfo(0, 0, 0);
         return;
       }
 
@@ -1523,7 +1557,7 @@ ${characterPrompt}
       });
     }
 
-    function updateCharacterSearchInfo(filteredCount = null, totalCount = null) {
+    function updateCharacterSearchInfo(filteredCount = null, totalCount = null, rawFilteredCount = null) {
       const currentCategoryId = categorySelect.value;
 
       const total = totalCount ?? characters.filter((character) => {
@@ -1531,74 +1565,144 @@ ${characterPrompt}
       }).length;
 
       const filtered = filteredCount ?? getFilteredCharacters().length;
+      const rawFiltered = rawFilteredCount ?? filtered;
       const keyword = normalizeSearchText(characterSearch.value);
+      const categoryName = getCategoryNameById(currentCategoryId) || "カテゴリ未選択";
+
+      const hiddenSelectedCount = Math.max(0, rawFiltered - filtered);
+      const hiddenText = hiddenSelectedCount > 0
+        ? `（選択済み非表示：${hiddenSelectedCount}件）`
+        : "";
 
       if (keyword) {
-        characterSearchInfo.textContent = `検索中：${filtered}件 / このカテゴリ全体：${total}件`;
+        characterSearchInfo.textContent = `検索中：表示候補 ${filtered}件 / ヒット ${rawFiltered}件 / ${categoryName} 全体：${total}件 ${hiddenText}`;
       } else {
-        characterSearchInfo.textContent = `このカテゴリ全体：${total}件`;
+        characterSearchInfo.textContent = `${categoryName} 表示候補：${filtered}件 / 全体：${total}件 ${hiddenText}`;
       }
     }
 
     async function renderCharacters() {
       const renderToken = ++characterRenderToken;
       characterGrid.innerHTML = "";
+      characterLoadMoreWrap.classList.add("hidden");
 
       const currentCategoryId = categorySelect.value;
       const totalCount = characters.filter((character) => character.category_id === currentCategoryId).length;
-      const filteredCharacters = getFilteredCharacters();
+      const rawFilteredCharacters = getFilteredCharacters();
+      const shouldHideSelected = hideSelectedCharacters.checked;
+      const filteredCharacters = shouldHideSelected
+        ? rawFilteredCharacters.filter((character) => !selectedCharacters.some((item) => item.id === character.id))
+        : rawFilteredCharacters;
 
-      updateCharacterSearchInfo(filteredCharacters.length, totalCount);
+      updateCharacterSearchInfo(filteredCharacters.length, totalCount, rawFilteredCharacters.length);
 
       if (filteredCharacters.length === 0) {
         const keyword = normalizeSearchText(characterSearch.value);
-        characterGrid.innerHTML = keyword
-          ? `<div class="hint">検索条件に一致するキャラクターがありません。</div>`
-          : `<div class="hint">このカテゴリにはキャラクターがありません。</div>`;
+        if (rawFilteredCharacters.length > 0 && shouldHideSelected) {
+          characterGrid.innerHTML = `<div class="hint">検索条件に一致するキャラクターはすべて選択済みです。「選択済みのキャラクターを検索結果から隠す」を外すと表示できます。</div>`;
+        } else {
+          characterGrid.innerHTML = keyword
+            ? `<div class="hint">検索条件に一致するキャラクターがありません。</div>`
+            : `<div class="hint">このカテゴリにはキャラクターがありません。</div>`;
+        }
         return;
       }
 
+      const displayCount = Math.min(characterVisibleCount, filteredCharacters.length);
+      const displayCharacters = filteredCharacters.slice(0, displayCount);
       const fragment = document.createDocumentFragment();
 
-      for (const character of filteredCharacters) {
+      for (const character of displayCharacters) {
         if (renderToken !== characterRenderToken) return;
 
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "character-button";
-        button.dataset.id = character.id;
+        const categoryName = getCategoryNameById(character.category_id) || "未設定";
+        const isSelected = selectedCharacters.some((item) => item.id === character.id);
+        const isExpanded = expandedCharacterIds.has(character.id);
 
-        if (selectedCharacters.some((item) => item.id === character.id)) {
-          button.classList.add("selected");
-        }
+        const item = document.createElement("div");
+        item.className = "persona-compact-item";
+        item.dataset.id = character.id;
 
-        const signedUrl = await getSignedImageUrl(character.image_url, "character");
-
-        if (renderToken !== characterRenderToken) return;
-
-        button.innerHTML = `
-          ${
-            signedUrl
-              ? `<img class="character-thumb" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(character.name)}">`
-              : `<div class="character-placeholder">No Image</div>`
-          }
+        const row = document.createElement("div");
+        row.className = `persona-compact-row ${isSelected ? "selected" : ""}`;
+        row.innerHTML = `
           <div>
-            <strong>${escapeHtml(character.name)}</strong>
-            <div class="meta">${escapeHtml(getShortText(character.base_prompt, 120))}</div>
+            <div class="persona-compact-title">${escapeHtml(character.name)}${isSelected ? "（選択中）" : ""}</div>
+            <div class="persona-compact-meta">カテゴリ：${escapeHtml(categoryName)}</div>
+          </div>
+          <div class="persona-compact-actions">
+            <button class="${isSelected ? "secondary" : "primary"} small" type="button" data-action="select">${isSelected ? "解除" : "選択"}</button>
+            <button class="secondary small" type="button" data-action="detail">${isExpanded ? "閉じる" : "詳細"}</button>
           </div>
         `;
 
-        button.addEventListener("click", () => {
+        row.querySelector('[data-action="select"]').addEventListener("click", () => {
           toggleCharacter(character);
         });
 
-        fragment.appendChild(button);
+        row.querySelector('[data-action="detail"]').addEventListener("click", () => {
+          toggleCharacterDetail(character.id);
+        });
+
+        item.appendChild(row);
+
+        if (isExpanded) {
+          const detail = document.createElement("div");
+          detail.className = "persona-detail-card";
+
+          const signedUrl = await getSignedImageUrl(character.image_url, "character");
+
+          if (renderToken !== characterRenderToken) return;
+
+          detail.innerHTML = `
+            ${
+              signedUrl
+                ? `<img class="character-thumb" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(character.name)}">`
+                : `<div class="character-placeholder">No Image</div>`
+            }
+            <div class="persona-detail-body">
+              <strong>${escapeHtml(character.name)}</strong>
+              <div class="meta">カテゴリ：${escapeHtml(categoryName)}</div>
+              <div class="meta">${escapeHtml(character.base_prompt || "base_prompt未入力")}</div>
+              <div class="actions" style="margin-top:12px;">
+                <button class="${isSelected ? "secondary" : "primary"} small" type="button" data-action="detail-select">${isSelected ? "このキャラクターを解除" : "このキャラクターを選択"}</button>
+              </div>
+            </div>
+          `;
+
+          detail.querySelector('[data-action="detail-select"]').addEventListener("click", () => {
+            toggleCharacter(character);
+          });
+
+          item.appendChild(detail);
+        }
+
+        fragment.appendChild(item);
       }
 
       if (renderToken !== characterRenderToken) return;
 
       characterGrid.innerHTML = "";
       characterGrid.appendChild(fragment);
+
+      if (filteredCharacters.length > displayCount) {
+        characterLoadMoreBtn.textContent = `さらに表示（${displayCount}/${filteredCharacters.length}件）`;
+        characterLoadMoreWrap.classList.remove("hidden");
+      }
+    }
+
+    function resetCharacterListView() {
+      characterVisibleCount = CHARACTER_PAGE_SIZE;
+    }
+
+    function toggleCharacterDetail(id) {
+      if (expandedCharacterIds.has(id)) {
+        expandedCharacterIds.delete(id);
+      } else {
+        expandedCharacterIds.add(id);
+      }
+
+      renderCharacters();
     }
 
     function toggleCharacter(character) {
@@ -1622,6 +1726,7 @@ ${characterPrompt}
 
     function clearSelectedCharacters() {
       selectedCharacters = [];
+      resetCharacterListView();
       renderCharacters();
       renderSelectedCharacterSummary();
       setStatus("選択中キャラクターを全解除しました。", "success");
@@ -1629,6 +1734,7 @@ ${characterPrompt}
 
     function clearCharacterSearch() {
       characterSearch.value = "";
+      resetCharacterListView();
       renderCharacters();
       setStatus("キャラクター検索をクリアしました。", "success");
     }
@@ -1642,10 +1748,11 @@ ${characterPrompt}
       }
 
       selectedCharacters.forEach((character) => {
+        const categoryName = getCategoryNameById(character.category_id) || "未設定";
         const chip = document.createElement("span");
         chip.className = "selected-chip";
         chip.innerHTML = `
-          <span>${escapeHtml(character.name)}</span>
+          <span>${escapeHtml(character.name)} / ${escapeHtml(categoryName)}</span>
           <button type="button" aria-label="解除">×</button>
         `;
         chip.querySelector("button").addEventListener("click", () => {
@@ -2539,10 +2646,22 @@ ${buildCharacterPromptBlock()}
     clearPersonaSearchBtn.addEventListener("click", clearPersonaSearch);
 
     categorySelect.addEventListener("change", async () => {
+      resetCharacterListView();
       await renderCharacters();
     });
 
     characterSearch.addEventListener("input", async () => {
+      resetCharacterListView();
+      await renderCharacters();
+    });
+
+    hideSelectedCharacters.addEventListener("change", async () => {
+      resetCharacterListView();
+      await renderCharacters();
+    });
+
+    characterLoadMoreBtn.addEventListener("click", async () => {
+      characterVisibleCount += CHARACTER_PAGE_SIZE;
       await renderCharacters();
     });
 
@@ -2553,7 +2672,7 @@ ${buildCharacterPromptBlock()}
     generateBtn.addEventListener("click", generatePrompt);
 
     copyStyleExploreTemplateBtn.addEventListener("click", () => {
-      copyText(STYLE_EXPLORE_REQUEST_TEMPLATE, "画風探索依頼テンプレート");
+      copyText(buildStyleExploreRequestTemplate(), "画風探索依頼テンプレート");
     });
 
     copyRequestBtn.addEventListener("click", copyLatestApiRequestText);
