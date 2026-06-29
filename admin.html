@@ -486,6 +486,12 @@
 
           <label for="personaInstruction">system_instruction</label>
           <textarea id="personaInstruction" placeholder="絵師ペルソナの特徴、画風、構図、色、雰囲気など"></textarea>
+          <div class="actions" style="margin-top: 10px;">
+            <button class="secondary" id="copyPersonaRebuildTemplateBtn" type="button">絵師ペルソナ化依頼テンプレートをコピー</button>
+          </div>
+          <p class="hint">
+            採用画像から、再利用できる絵師ペルソナを作成したいときの依頼文をコピーできます。
+          </p>
 
           <div class="image-upload-box">
             <h3>胸像画像</h3>
@@ -761,6 +767,7 @@
     const personaName = document.getElementById("personaName");
     const personaCategory = document.getElementById("personaCategory");
     const personaInstruction = document.getElementById("personaInstruction");
+    const copyPersonaRebuildTemplateBtn = document.getElementById("copyPersonaRebuildTemplateBtn");
     const personaImageUrl = document.getElementById("personaImageUrl");
     const personaIsActive = document.getElementById("personaIsActive");
     const personaUploadFolder = document.getElementById("personaUploadFolder");
@@ -800,6 +807,30 @@
 
     const saveCharacterBtn = document.getElementById("saveCharacterBtn");
     const newCharacterBtn = document.getElementById("newCharacterBtn");
+
+    const PERSONA_REBUILD_REQUEST_TEMPLATE = `この採用画像の画風を分析して、画像生成AIで再利用できる絵師ペルソナとして再構築してください。
+目的は、採用した画風を以後の画像生成で一貫して使えるように、画風ルールとして言語化することです。
+
+以下の観点で整理してください。
+・画風の中核
+・線の扱い
+・塗りとレンダリング
+・色彩設計
+・光と影
+・質感
+・構図と視線誘導
+・描写の優先順位
+・生成時に守るべきルール
+・避けるべき表現、禁止事項
+
+出力条件：
+・特定の画像生成サービス名に依存しない汎用的な文章にする
+・人物名、会社名、作品名、作家名、ブランド名など不明な固有名詞は推測しない
+・単なる画像説明ではなく、以後の画像生成で使い回せるsystem_instruction形式の絵師設定として書く
+・必要に応じて、短い絵師名候補も3案出す
+
+採用画像：
+ここに画像を添付`.trim();
 
     function setStatus(el, message, type = "") {
       el.textContent = message;
@@ -2174,6 +2205,15 @@
         setStatus(globalStatus, "再読み込みしました。", "success");
       } catch (error) {
         setStatus(globalStatus, `再読み込みエラー：${error.message}`, "error");
+      }
+    });
+
+    copyPersonaRebuildTemplateBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(PERSONA_REBUILD_REQUEST_TEMPLATE);
+        setStatus(globalStatus, "絵師ペルソナ化依頼テンプレートをコピーしました。", "success");
+      } catch {
+        setStatus(globalStatus, "絵師ペルソナ化依頼テンプレートのコピーに失敗しました。", "error");
       }
     });
 
