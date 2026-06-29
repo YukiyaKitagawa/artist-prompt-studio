@@ -873,6 +873,68 @@
       return characterBlocks.join("\n\n");
     }
 
+    const STYLE_EXPLORATION_POOL = [
+      { title: "アニメ・漫画系", description: "キャラクター性、表情、ポーズ、読みやすいシルエットを重視する" },
+      { title: "シネマティック・リアル系", description: "映画的な光、奥行き、空気感、質感、現実感を重視する" },
+      { title: "フラットグラフィック系", description: "大胆な色面、太い線、記号性、ポスター性、視覚インパクトを重視する" },
+      { title: "伝統画材・アナログ系", description: "水彩、鉛筆、インク、紙、絵具、手描きの質感を重視する" },
+      { title: "ダーク・未来感・サイバーパンク系", description: "暗い背景、発光、メカニカルディテール、強い明暗差を重視する" },
+      { title: "絵本・親しみ系", description: "やさしい形、温かい色、柔らかい質感、親しみやすさを重視する" },
+      { title: "ミニマル・高級広告系", description: "余白、洗練、少ない色数、上品な商品広告のような構図を重視する" },
+      { title: "レトロ印刷・ポスター系", description: "古い印刷物、網点、版ズレ、紙焼け、レトロなポスター感を重視する" },
+      { title: "立体クラフト・素材表現系", description: "粘土、紙細工、ジオラマ、刺繍、木材など、手で作られた立体素材感を重視する" },
+      { title: "抽象・幻想アート系", description: "現実の形を大胆に崩し、夢、象徴、抽象形状、幻想的な色彩を重視する" },
+      { title: "水彩・にじみ系", description: "輪郭の曖昧さ、にじみ、ぼかし、透明感、偶然性のある色の混ざりを重視する" },
+      { title: "鉛筆・モノクロ精密描写系", description: "白黒の濃淡、精密な描き込み、紙の目、陰影による立体感を重視する" },
+      { title: "厚塗りコンセプトアート系", description: "重厚な筆致、色面の積層、ドラマチックな演出、壮大な世界観を重視する" },
+      { title: "ピクセルアート・ゲーム系", description: "ドットの記号性、ゲーム画面らしい整理、限られた解像感を重視する" },
+      { title: "コミックブック・アメコミ系", description: "力強い輪郭、ハーフトーン、誇張されたポーズ、ヒロイックな演出を重視する" },
+      { title: "和風・版画・浮世絵系", description: "平面的な構成、版画調の色面、和紙感、和風の意匠を重視する" },
+      { title: "パステル・ゆるポップ系", description: "やわらかな形、明るいパステルカラー、軽快で親しみやすい印象を重視する" },
+      { title: "ホラー・不穏系", description: "不安感のある陰影、歪み、静かな恐怖、異様な空気感を重視する" },
+      { title: "SF設計画・テクニカルイラスト系", description: "設計図のような整理、構造理解、注視しやすい技術感を重視する" },
+      { title: "ファッション誌・エディトリアル系", description: "洗練されたレイアウト感、スタイリング、美的な余白感を重視する" },
+      { title: "クレイアニメ・ストップモーション系", description: "粘土の指跡、実在するミニチュア感、手作りの立体感を重視する" },
+      { title: "低ポリゴン3D・CG系", description: "単純化された立体、幾何学的な面構成、CGらしい空間感を重視する" },
+      { title: "切り絵・シルエット系", description: "明快な輪郭、切り絵の重なり、強い形のコントラストを重視する" },
+      { title: "ステンドグラス・モザイク系", description: "分割された色面、装飾性、光を通したような輝きを重視する" },
+      { title: "ノワール・モノクロ映画系", description: "硬質な白黒、強いコントラスト、影のドラマ、退廃的な映画感を重視する" },
+      { title: "マジックアワー・情景エモ系", description: "夕景や朝焼けの感情的な光、空気の温度感、風景の情緒を重視する" },
+      { title: "キッズ教材・図解親和系", description: "わかりやすさ、親切な形状、教育的な整理、明るい安心感を重視する" },
+      { title: "企業パンフレット・実用広報系", description: "誠実さ、整理された構図、実用性、読みやすいビジュアル印象を重視する" },
+      { title: "トイパッケージ・商品化デザイン系", description: "商品パッケージのような華やかさ、立体感、販促向けの魅力を重視する" },
+      { title: "アイソメトリック図解系", description: "俯瞰的で整理された空間、情報図解のしやすさ、構造の見やすさを重視する" },
+      { title: "スクラッチボード・版刻線系", description: "黒地に削り出すような線、強い線密度、硬質な手作業感を重視する" },
+      { title: "ネオンポップ・クラブビジュアル系", description: "鮮烈な発色、発光色、夜のエネルギー、クラブポスター的な勢いを重視する" },
+      { title: "自然観察・博物画系", description: "丁寧な観察、写実的な細部、図鑑のような品位と正確さを重視する" },
+      { title: "童話ファンタジー・装飾画系", description: "装飾的なモチーフ、夢見心地の世界、物語性のある美しさを重視する" },
+      { title: "チョークアート・黒板描画系", description: "粉っぽい線、黒板上の描画感、手書きの親しみやすさを重視する" },
+      { title: "水墨・墨絵系", description: "墨のにじみ、余白、美しい省略、筆の勢いを重視する" },
+      { title: "エアブラシ・80年代ビジュアル系", description: "なめらかなグラデーション、レトロフューチャー感、80年代的な光沢感を重視する" },
+      { title: "木版・民芸ポスター系", description: "素朴な版のズレ、民芸調の温かみ、簡潔な形と色を重視する" },
+      { title: "新聞風・報道イラスト系", description: "簡潔な情報伝達、紙面向けの落ち着き、社会性のある視覚表現を重視する" },
+      { title: "UIモック・未来インターフェース系", description: "情報レイヤー、半透明表示、未来的UI、デジタル計器感を重視する" }
+    ];
+
+    function pickRandomStyleExplorationDirections(count = 10) {
+      const pool = [...STYLE_EXPLORATION_POOL];
+      for (let i = pool.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [pool[i], pool[j]] = [pool[j], pool[i]];
+      }
+      return pool.slice(0, Math.min(count, pool.length));
+    }
+
+    function buildStyleDirectionList(selectedStyles) {
+      const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      return selectedStyles.map((style, index) => `・${labels[index]}案：${style.title}`).join("\n");
+    }
+
+    function buildStyleDirectionDescriptions(selectedStyles) {
+      const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+      return selectedStyles.map((style, index) => `・${labels[index]}案：${style.description}`).join("\n");
+    }
+
     function buildStyleExploreRequestTemplate() {
       const sourcePromptParts = [];
 
@@ -893,19 +955,26 @@
         ? sourcePromptParts.join("\n\n")
         : "ここに画像生成用の長文プロンプトを貼り付け";
 
-      return `以下の画像生成AI用長文プロンプトを、固有名詞を除いた別の画像生成サービス向けの画風探索プロンプトに整理してください。
-目的は、特定の絵師・キャラクター名・会社名・作品名・作家名に依存せず、画風・質感・光・色・構図の候補を比較生成することです。
+      const selectedStyles = pickRandomStyleExplorationDirections(10);
+      const directionList = buildStyleDirectionList(selectedStyles);
+      const directionDescriptions = buildStyleDirectionDescriptions(selectedStyles);
 
-3案ください。
-・A案：原文忠実
-・B案：雰囲気重視
-・C案：質感重視
+      return `以下の画像生成AI用長文プロンプトをもとに、別の画像生成サービスで画風探索を行うためのプロンプト案を作成してください。
+目的は、特定のキャラクターや固有名詞を再現することではなく、同じ題材を使って多様な画風の方向性を比較することです。
+
+今回は40案の画風プールからランダムに選ばれた以下の10方向で、それぞれ画像生成AIに直接貼り付けられる1本の英語プロンプトを作成してください。
+${directionList}
+
+各案の方向性：
+${directionDescriptions}
 
 出力条件：
-・キャラクター名、会社名、作品名、作家名、ブランド名などの固有名詞は一般表現へ置き換える
+・キャラクター名、会社名、作品名、作家名、ブランド名などの固有名詞は除去または一般表現へ置き換える
 ・キャラクター情報が含まれる場合は、名前ではなく外見的特徴だけを簡潔に残す
-・被写体そのものよりも、線、塗り、色彩、光、質感、構図、密度、雰囲気を重視する
-・各案はコピーしやすい1本のプロンプトとして出力する
+・登場キャラクターの外見的特徴は、被写体を保つための最低限の条件として扱う
+・各案の違いは、キャラクター設定ではなく、画風、線、色、光、質感、構図、媒体感に出す
+・同じ題材を保ちながらも、見た目の方向性が明確に異なる提案にする
+・各案はコピーしやすい1本の英語プロンプトとして出力する
 ・必要に応じて、アスペクト比やスタイル強度などの汎用パラメータ候補も添える
 
 元の長文プロンプト：
