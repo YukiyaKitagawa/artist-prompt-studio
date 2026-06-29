@@ -762,6 +762,117 @@
     const COOLDOWN_KEY = "artist_prompt_generation_cooldown_until_v1";
     const DEFAULT_COOLDOWN_SECONDS = 60;
 
+    function escapeRegExp(value) {
+      return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
+    function removeKnownProperNouns(text, character = null) {
+      let cleaned = String(text || "");
+
+      const namesToRemove = [
+        character?.name,
+        "永野建設株式会社",
+        "永野建設",
+        "Nagano Construction",
+        "NAGANO",
+        "Nagano",
+        "ナガノ",
+        "ChatGPT",
+        "Midjourney",
+      ].filter(Boolean);
+
+      for (const name of namesToRemove) {
+        const escaped = escapeRegExp(name);
+        cleaned = cleaned.replace(new RegExp(escaped, "gi"), "");
+      }
+
+      cleaned = cleaned
+        .replace(/[「『][^」』]{1,40}[」』]/g, "")
+        .replace(/["“”][^"“”]{1,40}["“”]/g, "")
+        .replace(/[A-Z][A-Z0-9_ -]{2,30}(?=\s*(logo|mark|text|word|letters?|ロゴ|文字|マーク))/gi, "")
+        .replace(/\s{2,}/g, " ")
+        .replace(/[ 　]+([、。,.])/g, "$1")
+        .trim();
+
+      return cleaned;
+    }
+
+    function splitFeatureCandidates(text) {
+      return String(text || "")
+        .replace(/\r/g, "\n")
+        .split(/[\n。.!?；;]+/)
+        .flatMap((part) => part.split(/(?<=,|、)\s*/))
+        .map((part) => part.trim().replace(/^[・\-—–●○\d.）)\s]+/, ""))
+        .filter(Boolean);
+    }
+
+    function isVisualFeatureSentence(text) {
+      const visualKeywords = [
+        "cat", "dog", "shiba", "animal", "fur", "hair", "eyes", "ears", "tail",
+        "wear", "wearing", "jacket", "vest", "helmet", "pants", "uniform", "glasses",
+        "device", "core", "collar", "towel", "waist", "boots", "gloves", "color", "colored",
+        "light gray", "dark gray", "reddish", "brown", "navy", "white", "black",
+        "猫", "犬", "柴犬", "動物", "毛", "毛並み", "髪", "目", "瞳", "耳", "尻尾",
+        "着", "服", "作業着", "ジャケット", "ベスト", "ヘルメット", "ズボン", "眼鏡",
+        "装置", "首", "首元", "腰", "タオル", "靴", "手袋", "色", "白", "黒", "グレー",
+        "灰", "茶", "赤茶", "紺", "外見", "表情", "体格", "シルエット"
+      ];
+
+      const lower = String(text || "").toLowerCase();
+      return visualKeywords.some((keyword) => lower.includes(keyword.toLowerCase()));
+    }
+
+    function compactFeatureSentence(text) {
+      return String(text || "")
+        .replace(/\s+/g, " ")
+        .replace(/^[,、。・\s]+|[,、。・\s]+$/g, "")
+        .slice(0, 150);
+    }
+
+    function extractCharacterVisualFeatures(character) {
+      const cleanedPrompt = removeKnownProperNouns(character?.base_prompt || "", character);
+      const candidates = splitFeatureCandidates(cleanedPrompt);
+      let features = candidates
+        .filter(isVisualFeatureSentence)
+        .map(compactFeatureSentence)
+        .filter((item) => item.length >= 4);
+
+      if (features.length === 0 && cleanedPrompt.trim()) {
+        features = splitFeatureCandidates(cleanedPrompt)
+          .map(compactFeatureSentence)
+          .filter((item) => item.length >= 4);
+      }
+
+      const uniqueFeatures = [];
+      for (const feature of features) {
+        if (!uniqueFeatures.some((item) => item === feature)) {
+          uniqueFeatures.push(feature);
+        }
+        if (uniqueFeatures.length >= 4) break;
+      }
+
+      return uniqueFeatures;
+    }
+
+    function buildSelectedCharacterVisualFeatureSection() {
+      if (!selectedCharacters.length) return "";
+
+      const characterBlocks = selectedCharacters.map((character, index) => {
+        const features = extractCharacterVisualFeatures(character);
+        const label = selectedCharacters.length === 1
+          ? "登場キャラクターの外見的特徴"
+          : `登場キャラクター${index + 1}の外見的特徴`;
+
+        if (features.length === 0) {
+          return `${label}：\n・外見的特徴は未抽出です。必要に応じて、固有名詞を除いた見た目の特徴を追記してください。`;
+        }
+
+        return `${label}：\n${features.map((feature) => `・${feature}`).join("\n")}`;
+      });
+
+      return characterBlocks.join("\n\n");
+    }
+
     function buildStyleExploreRequestTemplate() {
       const sourcePromptParts = [];
 
@@ -771,6 +882,11 @@
 
       if (extraText.value.trim()) {
         sourcePromptParts.push(`追加条件：\n${extraText.value.trim()}`);
+      }
+
+      const characterFeatureSection = buildSelectedCharacterVisualFeatureSection();
+      if (characterFeatureSection) {
+        sourcePromptParts.push(characterFeatureSection);
       }
 
       const sourcePrompt = sourcePromptParts.length > 0
@@ -787,6 +903,7 @@
 
 出力条件：
 ・キャラクター名、会社名、作品名、作家名、ブランド名などの固有名詞は一般表現へ置き換える
+・キャラクター情報が含まれる場合は、名前ではなく外見的特徴だけを簡潔に残す
 ・被写体そのものよりも、線、塗り、色彩、光、質感、構図、密度、雰囲気を重視する
 ・各案はコピーしやすい1本のプロンプトとして出力する
 ・必要に応じて、アスペクト比やスタイル強度などの汎用パラメータ候補も添える
