@@ -144,6 +144,86 @@
       gap: 10px;
     }
 
+    .persona-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .persona-compact-list {
+      display: grid;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .persona-compact-item {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: rgba(31, 41, 55, 0.66);
+      overflow: hidden;
+    }
+
+    .persona-compact-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      padding: 11px 12px;
+    }
+
+    .persona-compact-row.selected {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.18), rgba(167, 139, 250, 0.14));
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+
+    .persona-compact-title {
+      font-weight: 900;
+      font-size: 14px;
+      color: #f9fafb;
+    }
+
+    .persona-compact-meta {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .persona-compact-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .persona-detail-card {
+      border-top: 1px solid var(--border);
+      padding: 13px;
+      background: rgba(15, 23, 42, 0.58);
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .persona-detail-body {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .persona-detail-body strong {
+      display: block;
+      margin-bottom: 5px;
+      font-size: 15px;
+    }
+
+    .persona-load-more-wrap {
+      margin-top: 12px;
+      text-align: center;
+    }
+
     .persona-button,
     .character-button {
       border: 1px solid var(--border);
@@ -433,8 +513,17 @@
 
     @media (max-width: 680px) {
       .option-grid,
-      .search-row {
+      .search-row,
+      .persona-compact-row {
         grid-template-columns: 1fr;
+      }
+
+      .persona-compact-actions {
+        justify-content: flex-start;
+      }
+
+      .persona-detail-card {
+        flex-direction: column;
       }
 
       main {
@@ -491,9 +580,22 @@
           検索語を入力すると、現在の絵師カテゴリ内で絞り込みます。
         </p>
 
-        <div id="personaGrid" class="grid" style="margin-top: 14px;"></div>
+        <div class="persona-toolbar">
+          <label class="check-card" style="margin:0;">
+            <input id="hideSelectedPersonas" type="checkbox" checked />
+            <span>選択済みの絵師を検索結果から隠す</span>
+          </label>
+        </div>
 
-        <div class="selected-summary" id="selectedPersonaSummary"></div>
+        <div class="section-block" style="margin-top:16px; padding-top:14px;">
+          <h3 style="margin-bottom:8px;">選択中の絵師</h3>
+          <div class="selected-summary" id="selectedPersonaSummary"></div>
+        </div>
+
+        <div id="personaGrid" class="persona-compact-list"></div>
+        <div id="personaLoadMoreWrap" class="persona-load-more-wrap hidden">
+          <button class="secondary small" id="personaLoadMoreBtn" type="button">さらに表示</button>
+        </div>
 
         <label for="collabPattern">共創パターン</label>
         <select id="collabPattern" disabled>
@@ -584,6 +686,7 @@
 
         <div class="actions">
           <button class="primary" id="generateBtn">プロンプト生成</button>
+          <button class="secondary" id="copyStyleExploreTemplateBtn">画風探索依頼テンプレートをコピー</button>
           <button class="secondary" id="copyRequestBtn">API送信文をコピー</button>
           <button class="secondary" id="exportRequestJsonBtn">設定付きJSON出力</button>
           <button class="secondary" id="clearInputBtn">入力をクリア</button>
@@ -642,8 +745,26 @@
     const HISTORY_STORAGE_KEY = "artist_prompt_generation_history_v2";
     const MAX_HISTORY_ITEMS = 20;
     const MAX_PERSONA_SELECTION = 2;
+    const PERSONA_PAGE_SIZE = 10;
     const COOLDOWN_KEY = "artist_prompt_generation_cooldown_until_v1";
     const DEFAULT_COOLDOWN_SECONDS = 60;
+
+    const STYLE_EXPLORE_REQUEST_TEMPLATE = `以下の画像生成AI用長文プロンプトを、固有名詞を除いた別の画像生成サービス向けの画風探索プロンプトに整理してください。
+目的は、特定の絵師・キャラクター名・会社名・作品名・作家名に依存せず、画風・質感・光・色・構図の候補を比較生成することです。
+
+3案ください。
+・A案：原文忠実
+・B案：雰囲気重視
+・C案：質感重視
+
+出力条件：
+・キャラクター名、会社名、作品名、作家名、ブランド名などの固有名詞は一般表現へ置き換える
+・被写体そのものよりも、線、塗り、色彩、光、質感、構図、密度、雰囲気を重視する
+・各案はコピーしやすい1本のプロンプトとして出力する
+・必要に応じて、アスペクト比やスタイル強度などの汎用パラメータ候補も添える
+
+元の長文プロンプト：
+ここに貼り付け`.trim();
 
     const NONE_OPTION_LABELS = {
       no_text:
@@ -678,6 +799,9 @@
     let selectedPersonas = [];
     let selectedCharacters = [];
 
+    let expandedPersonaIds = new Set();
+    let personaVisibleCount = PERSONA_PAGE_SIZE;
+
     let isGenerating = false;
     let cooldownUntil = Number(localStorage.getItem(COOLDOWN_KEY) || 0);
     let cooldownTimer = null;
@@ -695,6 +819,9 @@
     const clearPersonaSearchBtn = document.getElementById("clearPersonaSearchBtn");
     const personaSearchInfo = document.getElementById("personaSearchInfo");
     const personaGrid = document.getElementById("personaGrid");
+    const personaLoadMoreWrap = document.getElementById("personaLoadMoreWrap");
+    const personaLoadMoreBtn = document.getElementById("personaLoadMoreBtn");
+    const hideSelectedPersonas = document.getElementById("hideSelectedPersonas");
     const selectedPersonaSummary = document.getElementById("selectedPersonaSummary");
     const collabPattern = document.getElementById("collabPattern");
 
@@ -710,6 +837,7 @@
     const extraText = document.getElementById("extraText");
 
     const generateBtn = document.getElementById("generateBtn");
+    const copyStyleExploreTemplateBtn = document.getElementById("copyStyleExploreTemplateBtn");
     const copyRequestBtn = document.getElementById("copyRequestBtn");
     const exportRequestJsonBtn = document.getElementById("exportRequestJsonBtn");
     const clearInputBtn = document.getElementById("clearInputBtn");
@@ -1125,7 +1253,7 @@ ${characterPrompt}
       });
     }
 
-    function updatePersonaSearchInfo(filteredCount = null, totalCount = null) {
+    function updatePersonaSearchInfo(filteredCount = null, totalCount = null, rawFilteredCount = null) {
       const currentCategoryId = personaCategorySelect.value;
 
       const total = totalCount ?? personas.filter((persona) => {
@@ -1134,22 +1262,29 @@ ${characterPrompt}
       }).length;
 
       const filtered = filteredCount ?? getFilteredPersonas().length;
+      const rawFiltered = rawFilteredCount ?? filtered;
 
       const keyword = normalizeSearchText(personaSearch.value);
       const categoryName = currentCategoryId
         ? getPersonaCategoryNameById(currentCategoryId)
         : "すべての絵師カテゴリ";
 
+      const hiddenSelectedCount = Math.max(0, rawFiltered - filtered);
+      const hiddenText = hiddenSelectedCount > 0
+        ? `（選択済み非表示：${hiddenSelectedCount}件）`
+        : "";
+
       if (keyword) {
-        personaSearchInfo.textContent = `検索中：${filtered}件 / ${categoryName} 全体：${total}件`;
+        personaSearchInfo.textContent = `検索中：表示候補 ${filtered}件 / ヒット ${rawFiltered}件 / ${categoryName} 全体：${total}件 ${hiddenText}`;
       } else {
-        personaSearchInfo.textContent = `${categoryName} 全体：${total}件`;
+        personaSearchInfo.textContent = `${categoryName} 表示候補：${filtered}件 / 全体：${total}件 ${hiddenText}`;
       }
     }
 
     async function renderPersonas() {
       const renderToken = ++personaRenderToken;
       personaGrid.innerHTML = "";
+      personaLoadMoreWrap.classList.add("hidden");
 
       const currentCategoryId = personaCategorySelect.value;
       const totalCount = personas.filter((persona) => {
@@ -1157,60 +1292,121 @@ ${characterPrompt}
         return persona.category_id === currentCategoryId;
       }).length;
 
-      const filteredPersonas = getFilteredPersonas();
-      updatePersonaSearchInfo(filteredPersonas.length, totalCount);
+      const rawFilteredPersonas = getFilteredPersonas();
+      const shouldHideSelected = hideSelectedPersonas.checked;
+      const filteredPersonas = shouldHideSelected
+        ? rawFilteredPersonas.filter((persona) => !selectedPersonas.some((item) => item.id === persona.id))
+        : rawFilteredPersonas;
+
+      updatePersonaSearchInfo(filteredPersonas.length, totalCount, rawFilteredPersonas.length);
 
       if (filteredPersonas.length === 0) {
         const keyword = normalizeSearchText(personaSearch.value);
-        personaGrid.innerHTML = keyword
-          ? `<div class="hint">検索条件に一致する絵師ペルソナがありません。</div>`
-          : `<div class="hint">この絵師カテゴリには有効な絵師ペルソナがありません。</div>`;
+        if (rawFilteredPersonas.length > 0 && shouldHideSelected) {
+          personaGrid.innerHTML = `<div class="hint">検索条件に一致する絵師はすべて選択済みです。「選択済みの絵師を検索結果から隠す」を外すと表示できます。</div>`;
+        } else {
+          personaGrid.innerHTML = keyword
+            ? `<div class="hint">検索条件に一致する絵師ペルソナがありません。</div>`
+            : `<div class="hint">この絵師カテゴリには有効な絵師ペルソナがありません。</div>`;
+        }
         return;
       }
 
+      const displayCount = Math.min(personaVisibleCount, filteredPersonas.length);
+      const displayPersonas = filteredPersonas.slice(0, displayCount);
       const fragment = document.createDocumentFragment();
 
-      for (const persona of filteredPersonas) {
+      for (const persona of displayPersonas) {
         if (renderToken !== personaRenderToken) return;
-
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "persona-button";
-        button.dataset.id = persona.id;
-
-        if (selectedPersonas.some((item) => item.id === persona.id)) {
-          button.classList.add("selected");
-        }
 
         const categoryName = getPersonaCategoryNameById(persona.category_id) || "未設定";
-        const signedUrl = await getSignedImageUrl(persona.image_url, "persona");
+        const isSelected = selectedPersonas.some((item) => item.id === persona.id);
+        const isExpanded = expandedPersonaIds.has(persona.id);
 
-        if (renderToken !== personaRenderToken) return;
+        const item = document.createElement("div");
+        item.className = "persona-compact-item";
+        item.dataset.id = persona.id;
 
-        button.innerHTML = `
-          ${
-            signedUrl
-              ? `<img class="persona-thumb" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(persona.name)}">`
-              : `<div class="persona-placeholder">No Image</div>`
-          }
+        const row = document.createElement("div");
+        row.className = `persona-compact-row ${isSelected ? "selected" : ""}`;
+        row.innerHTML = `
           <div>
-            <strong>${escapeHtml(persona.name)}</strong>
-            <div class="meta">カテゴリ：${escapeHtml(categoryName)}</div>
-            <div class="meta">${escapeHtml(getShortText(persona.system_instruction, 150))}</div>
+            <div class="persona-compact-title">${escapeHtml(persona.name)}${isSelected ? "（選択中）" : ""}</div>
+            <div class="persona-compact-meta">カテゴリ：${escapeHtml(categoryName)} / ${escapeHtml(getShortText(persona.system_instruction, 90))}</div>
+          </div>
+          <div class="persona-compact-actions">
+            <button class="${isSelected ? "secondary" : "primary"} small" type="button" data-action="select">${isSelected ? "解除" : "選択"}</button>
+            <button class="secondary small" type="button" data-action="detail">${isExpanded ? "閉じる" : "詳細"}</button>
           </div>
         `;
 
-        button.addEventListener("click", () => {
+        row.querySelector('[data-action="select"]').addEventListener("click", () => {
           togglePersona(persona);
         });
 
-        fragment.appendChild(button);
+        row.querySelector('[data-action="detail"]').addEventListener("click", () => {
+          togglePersonaDetail(persona.id);
+        });
+
+        item.appendChild(row);
+
+        if (isExpanded) {
+          const detail = document.createElement("div");
+          detail.className = "persona-detail-card";
+
+          const signedUrl = await getSignedImageUrl(persona.image_url, "persona");
+
+          if (renderToken !== personaRenderToken) return;
+
+          detail.innerHTML = `
+            ${
+              signedUrl
+                ? `<img class="persona-thumb" src="${escapeHtml(signedUrl)}" alt="${escapeHtml(persona.name)}">`
+                : `<div class="persona-placeholder">No Image</div>`
+            }
+            <div class="persona-detail-body">
+              <strong>${escapeHtml(persona.name)}</strong>
+              <div class="meta">カテゴリ：${escapeHtml(categoryName)}</div>
+              <div class="meta">${escapeHtml(persona.system_instruction || "system_instruction未入力")}</div>
+              <div class="actions" style="margin-top:12px;">
+                <button class="${isSelected ? "secondary" : "primary"} small" type="button" data-action="detail-select">${isSelected ? "この絵師を解除" : "この絵師を選択"}</button>
+              </div>
+            </div>
+          `;
+
+          detail.querySelector('[data-action="detail-select"]').addEventListener("click", () => {
+            togglePersona(persona);
+          });
+
+          item.appendChild(detail);
+        }
+
+        fragment.appendChild(item);
       }
 
       if (renderToken !== personaRenderToken) return;
 
       personaGrid.innerHTML = "";
       personaGrid.appendChild(fragment);
+
+      if (filteredPersonas.length > displayCount) {
+        personaLoadMoreBtn.textContent = `さらに表示（${displayCount}/${filteredPersonas.length}件）`;
+        personaLoadMoreWrap.classList.remove("hidden");
+      }
+    }
+
+    function resetPersonaListView() {
+      personaVisibleCount = PERSONA_PAGE_SIZE;
+    }
+
+    function togglePersonaDetail(id) {
+      if (expandedPersonaIds.has(id)) {
+        expandedPersonaIds.delete(id);
+      } else {
+        expandedPersonaIds.add(id);
+      }
+
+      renderPersonas();
     }
 
     function togglePersona(persona) {
@@ -1251,6 +1447,7 @@ ${characterPrompt}
 
     function clearPersonaSearch() {
       personaSearch.value = "";
+      resetPersonaListView();
       renderPersonas();
       setStatus("絵師検索をクリアしました。", "success");
     }
@@ -2320,10 +2517,22 @@ ${buildCharacterPromptBlock()}
     }
 
     personaCategorySelect.addEventListener("change", async () => {
+      resetPersonaListView();
       await renderPersonas();
     });
 
     personaSearch.addEventListener("input", async () => {
+      resetPersonaListView();
+      await renderPersonas();
+    });
+
+    hideSelectedPersonas.addEventListener("change", async () => {
+      resetPersonaListView();
+      await renderPersonas();
+    });
+
+    personaLoadMoreBtn.addEventListener("click", async () => {
+      personaVisibleCount += PERSONA_PAGE_SIZE;
       await renderPersonas();
     });
 
@@ -2342,6 +2551,10 @@ ${buildCharacterPromptBlock()}
     clearCharactersBtn.addEventListener("click", clearSelectedCharacters);
 
     generateBtn.addEventListener("click", generatePrompt);
+
+    copyStyleExploreTemplateBtn.addEventListener("click", () => {
+      copyText(STYLE_EXPLORE_REQUEST_TEMPLATE, "画風探索依頼テンプレート");
+    });
 
     copyRequestBtn.addEventListener("click", copyLatestApiRequestText);
 
