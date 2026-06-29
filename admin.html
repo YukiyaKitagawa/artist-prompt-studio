@@ -488,9 +488,10 @@
           <textarea id="personaInstruction" placeholder="絵師ペルソナの特徴、画風、構図、色、雰囲気など"></textarea>
           <div class="actions" style="margin-top: 10px;">
             <button class="secondary" id="copyPersonaRebuildTemplateBtn" type="button">絵師ペルソナ化依頼テンプレートをコピー</button>
+            <button class="secondary" id="copyPersonaMinimalRebuildTemplateBtn" type="button">最小構成ペルソナ化依頼をコピー</button>
           </div>
           <p class="hint">
-            採用画像から、再利用できる絵師ペルソナを作成したいときの依頼文をコピーできます。
+            採用画像から、再利用できる絵師ペルソナを作成したいときの依頼文をコピーできます。最小構成版は、画風再現に必要な5項目へ絞ってsystem_instruction化します。
           </p>
 
           <div class="image-upload-box">
@@ -768,6 +769,7 @@
     const personaCategory = document.getElementById("personaCategory");
     const personaInstruction = document.getElementById("personaInstruction");
     const copyPersonaRebuildTemplateBtn = document.getElementById("copyPersonaRebuildTemplateBtn");
+    const copyPersonaMinimalRebuildTemplateBtn = document.getElementById("copyPersonaMinimalRebuildTemplateBtn");
     const personaImageUrl = document.getElementById("personaImageUrl");
     const personaIsActive = document.getElementById("personaIsActive");
     const personaUploadFolder = document.getElementById("personaUploadFolder");
@@ -828,6 +830,38 @@
 ・人物名、会社名、作品名、作家名、ブランド名など不明な固有名詞は推測しない
 ・単なる画像説明ではなく、以後の画像生成で使い回せるsystem_instruction形式の絵師設定として書く
 ・必要に応じて、短い絵師名候補も3案出す
+
+採用画像：
+ここに画像を添付`.trim();
+
+    const PERSONA_MINIMAL_REBUILD_REQUEST_TEMPLATE = `この採用画像の画風を分析して、画像生成AIで再利用できる絵師プロンプトとして再構築してください。
+目的は、採用した画風を以後の画像生成で再現できるように、必要最低限のsystem_instructionとして言語化することです。
+
+以下の5項目だけで構成してください。
+
+## 画風の中核
+この画風が最も重視する視覚的な価値、第一印象、全体の美学を簡潔に定義してください。
+
+## 線の扱い
+主線の有無、線の太さ、エッジの硬さ、輪郭の強弱、線で描くのか面で描くのかを定義してください。
+
+## 質感と色彩設計
+画材感、表面素材、粒子感、塗りの密度、色数、彩度、明度、色の組み合わせ方を定義してください。
+
+## 光と影のコントロール
+光源、明暗差、影の硬さ、逆光・順光・発光・環境光などの扱いを定義してください。
+
+## 描写のフォーカス
+何を細かく描き、何を省略するか。人物、背景、質感、空気感、構図のどこに描写密度を置くかを定義してください。
+
+出力条件：
+・上記5項目以外の見出しは追加しない
+・各項目は2〜4文程度で簡潔にまとめる
+・単なる画像説明ではなく、今後の画像生成でそのまま使えるsystem_instructionとして書く
+・特定の画像生成サービス名に依存しない汎用的な文章にする
+・人物名、会社名、作品名、作家名、ブランド名など不明な固有名詞は推測しない
+・画風再現に不要なストーリー説明、感想、長い分析、候補名の提案は入れない
+・最終出力は、そのまま絵師ペルソナのsystem_instruction欄へ貼り付けられる文章にする
 
 採用画像：
 ここに画像を添付`.trim();
@@ -2214,6 +2248,15 @@
         setStatus(globalStatus, "絵師ペルソナ化依頼テンプレートをコピーしました。", "success");
       } catch {
         setStatus(globalStatus, "絵師ペルソナ化依頼テンプレートのコピーに失敗しました。", "error");
+      }
+    });
+
+    copyPersonaMinimalRebuildTemplateBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(PERSONA_MINIMAL_REBUILD_REQUEST_TEMPLATE);
+        setStatus(globalStatus, "最小構成ペルソナ化依頼テンプレートをコピーしました。", "success");
+      } catch {
+        setStatus(globalStatus, "最小構成ペルソナ化依頼テンプレートのコピーに失敗しました。", "error");
       }
     });
 
